@@ -1,0 +1,17 @@
+{
+  "name": "roygbiv",
+  "version": "1.0.0",
+  "description": "js13kGames 2026 entry. You play the rainbow. The unicorns have laughed enough.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "bash build.sh",
+    "gen80": "python3 mk80.py",
+    "test": "bash test/run.sh",
+    "build:alt": "bash build.sh index.html"
+  },
+  "devDependencies": {
+    "roadroller": "^2.1.0",
+    "terser": "^5.31.0"
+  }
+}

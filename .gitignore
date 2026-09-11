@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.bak.html
+.js13k-check/
+.gen-img/
+.shots/
+media/.js13k-images/

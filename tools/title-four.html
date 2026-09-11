@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROYGBIV / quatre ecrans titre</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0a0412;color:#c8b0e8;overflow:hidden;
+    font:12px/1.45 ui-monospace,Menlo,Consolas,monospace}
+  #bar{padding:8px 12px;background:#1c0c2e;border-bottom:1px solid #3a1c5c;
+    display:flex;gap:15px;align-items:center;flex-wrap:wrap;position:relative;z-index:2}
+  #bar b{color:#ffc61e;letter-spacing:2px}
+  label{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+  button{background:#3a1c5c;color:#e8d8ff;border:1px solid #6b3fa0;border-radius:4px;
+    padding:5px 9px;cursor:pointer;font:inherit}
+  canvas{display:block;width:100%;cursor:pointer}
+  #wrap{height:100%;display:flex;flex-direction:column}
+  #note{position:absolute;left:0;right:0;bottom:0;padding:9px 14px;
+    background:linear-gradient(transparent,#0a0412 60%);pointer-events:none}
+  #note b{color:#ffc61e}
+</style>
+<div id="wrap">
+  <div id="bar">
+    <b>QUATRE ECRANS TITRE</b>
+    <label><input id="anim" type="checkbox" checked> anim</label>
+    <label><input id="port" type="checkbox"> portrait</label>
+    <button id="back" style="display:none">tout voir</button>
+  </div>
+  <canvas id="c" style="flex:1;min-height:0"></canvas>
+</div>
+<div id="note"></div>
+<script>
+/* ---- kit de sprites, extrait tel quel du jeu ---- */
+var rnd=Math.random, PI=Math.PI, TAU=6.283185, cos=Math.cos, sin=Math.sin,
+    hyp=Math.hypot, atan=Math.atan2, mn=Math.min, mx=Math.max;
+function ri(n){ return rnd()*n|0; }
+function rr(a,b){ return a+rnd()*(b-a); }
+
+// ---------- palette ----------
+// the seven bands, red at the bottom of the arch, violet at the top
+var BAND=['#ff3355','#ff8a1f','#ffd42e','#5ce24a','#2fb8ff','#4a5cff','#a33bff'];
+var GRAY=['#4a4358','#514a60','#585167','#4f4a5e','#464154','#413c50','#3b3648'];
+var OUT='#150719', HORN='#ffd257', HORNH='#fff2b8', DK='#1a0b2b', HOOF='#5b3f7a';
+
+// ---------- vector sprite kit (DA validee au labo) ----------
+// Tout est dessine en primitives molles: ellipses, rects arrondis,
+// triangles. Style peluche facon Happy Tree Villains. Chaque sprite est
+// cuit une fois dans un canvas offscreen puis blitte.
+var V;                                    // contexte de dessin courant
+function offc(w,h,cx,cy,sc){
+  var c=document.createElement('canvas'); c.width=w; c.height=h;
+  V=c.getContext('2d'); V.translate(cx,cy); if(sc) V.scale(sc,sc);
+  return c;
+}
+function el(x,y,rx,ry,c,rot){ V.save(); V.translate(x,y); if(rot) V.rotate(rot);
+  V.scale(rx,ry); V.beginPath(); V.arc(0,0,1,0,TAU); V.restore();
+  V.fillStyle=c; V.fill(); }
+function elo(x,y,rx,ry,c,o){ el(x,y,rx+(o||.045),ry+(o||.045),OUT); el(x,y,rx,ry,c); }
+function rct(x,y,w,h,r,c){ V.beginPath(); V.moveTo(x+r,y);
+  V.arcTo(x+w,y,x+w,y+h,r); V.arcTo(x+w,y+h,x,y+h,r);
+  V.arcTo(x,y+h,x,y,r); V.arcTo(x,y,x+w,y,r); V.closePath();
+  V.fillStyle=c; V.fill(); }
+function tri(ax,ay,bx,by,cx,cy,c){ V.beginPath(); V.moveTo(ax,ay);
+  V.lineTo(bx,by); V.lineTo(cx,cy); V.closePath(); V.fillStyle=c; V.fill(); }
+function strk(c,w){ V.strokeStyle=c; V.lineWidth=w; V.lineCap='round'; V.stroke(); }
+// l'oeil vitreux, enorme, la signature du style
+function eyeq(x,y,r,lk){ elo(x,y,r,r*1.05,'#fff',.03);
+  el(x+lk*r*.3,y+r*.12,r*.52,r*.62,DK);
+  el(x+lk*r*.3-r*.16,y-r*.18,r*.19,r*.19,'#fff'); }
+
+// une licorne, de profil trois quarts, tournee vers la droite.
+function mkUni(b,sh,m,md){
+  var c=offc(92,100,46,50,42), i, a;
+  el(-.72,-.05,.2,.3,m,.2); el(-.8,.18,.15,.22,md,.2);      // queue
+  rct(-.5,.5,.19,.5,.09,sh); rct(-.24,.55,.19,.45,.09,b);   // pattes arriere
+  rct(.12,.5,.19,.5,.09,sh); rct(.34,.55,.19,.45,.09,b);
+  V.fillStyle=HOOF; V.fillRect(-.49,.92,.17,.08); V.fillRect(.35,.97,.17,.08);
+  elo(-.05,.24,.52,.4,b);                                    // corps
+  el(-.05,.34,.44,.28,sh); el(-.05,.14,.44,.28,b);
+  elo(.44,-.3,.42,.38,b);                                    // tete
+  el(.72,-.14,.24,.19,b); el(.78,-.12,.2,.15,'rgba(255,255,255,.32)');
+  el(.83,-.17,.035,.045,sh);                                 // naseau
+  for(i=0;i<7;i++){ a=-.6-i*.42;                             // criniere
+    el(.44+cos(a)*.4,-.3+sin(a)*.44,.2-i*.014,.22-i*.014,i%2?m:md); }
+  tri(.4,-.6,.62,-.56,.56,-1.08,OUT);                        // corne
+  tri(.43,-.62,.59,-.59,.56,-1.02,HORN); tri(.47,-.62,.54,-.6,.55,-.9,HORNH);
+  eyeq(.34,-.32,.155,1); eyeq(.63,-.32,.135,1);
+  el(.3,-.05,.1,.07,'#ff6fa8');                              // blush
+  V.beginPath(); V.arc(.66,-.05,.1,.2,2.6); strk(DK,.045);   // sourire
+  return c;
+}
+
+// une tete de licorne seule: sert au boss et aux tetes qui volent.
+function xe(x,y,r){ V.beginPath(); V.moveTo(x-r,y-r); V.lineTo(x+r,y+r);
+  V.moveTo(x+r,y-r); V.lineTo(x-r,y+r); strk(DK,r*.42); }
+function mkHead(b,sh,m,md,lg,S){
+  S=S||24;
+  var c=offc(S*2.34,S*2.34,S*1.084,S*1.334,S), i, a;
+  c.ox=S*1.084; c.oy=S*1.334;
+  for(i=0;i<5;i++){ a=3.3+i*.34;
+    el(cos(a)*.62,sin(a)*.66,.28-i*.02,.3-i*.02,i%2?m:md); }
+  elo(0,0,.585,.575,b,.03);
+  el(.35,.325,.39,.28,b);
+  el(.43,.345,.32,.221,'rgba(255,255,255,.3)');
+  el(.6,.18,.05,.06,sh);
+  tri(-.08,-.477,.24,-.443,.14,-1.2,OUT);
+  tri(-.04,-.494,.2,-.46,.13,-1.12,HORN);
+  tri(.02,-.494,.08,-.477,.11,-.941,HORNH);
+  // lg vaut 0 (sourire ferme), 1 (elle se marre) ou 2 (elle est morte)
+  if(lg>1){ xe(-.18,-.095,.2); xe(.305,-.16,.175);
+    V.beginPath(); V.arc(.4,.5,.19,3.5,5.9); strk(DK,.1);   // bouche tombante
+    el(.62,.42,.09,.14,'#ff5f8f',.4); }                     // langue qui pend
+  else {
+    eyeq(-.18,-.095,.24,1); eyeq(.305,-.16,.21,1);
+    el(-.09,.3,.13,.09,'#ff6fa8');
+    if(lg){ elo(.365,.34,.29,.19,'#3a1030',.03);
+      el(.365,.44,.14,.08,'#ff5f8f');
+      V.fillStyle='#fff'; V.fillRect(.225,.12,.31,.066);
+      el(.38,.186,.155,.054,'#fff'); }
+    else { V.beginPath(); V.arc(.425,.27,.2,.2,2.6); strk(DK,.126); } }
+  return c;
+}
+
+// le heros: une arche de 7 bandes, violet en haut, tete de furieux.
+// li = bandes encore peintes, lv = bandes debloquees.
+var heroCache={};
+function heroSpr(li,lv,S){
+  S=S||32;
+  var k=li*8+lv+S*100, q=heroCache[k]; if(q) return q;
+  var c=offc(S*2.2,S*1.5,S*1.1,S*0.46,S), i;
+  c.ox=S*1.1; c.oy=S*0.46;
+  var R=.98, r0=.44, e=(R-r0)/7, fx=(R+r0)/2, fw=.44,
+      lc=li>0?BAND[0]:GRAY[0];
+  rct(-fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                   // un pied sous
+  rct(fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                    // chaque jambe
+  rct(-fx-fw/2,.54,fw,.36,.13,lc);
+  rct(fx-fw/2,.54,fw,.36,.13,lc);
+  V.beginPath(); V.arc(0,.62,R+.05,PI,0); V.arc(0,.62,r0-.05,0,PI,1);
+  V.closePath(); V.fillStyle=OUT; V.fill();                  // le contour de l'anneau
+  for(i=0;i<7;i++){                                          // rouge dehors, violet dedans
+    V.beginPath(); V.arc(0,.62,R-i*e,PI,0); V.arc(0,.62,R-(i+1)*e,0,PI,1);
+    V.closePath(); V.fillStyle = i<li?BAND[i] : (i<lv?GRAY[i]:'#2a2140'); V.fill(); }
+  eyeq(-.164,-.2,.131,0); eyeq(.164,-.2,.131,0);             // le visage, sur la couronne
+  V.beginPath(); V.moveTo(-.312,-.415); V.lineTo(-.041,-.276); strk(DK,.074);
+  V.beginPath(); V.moveTo(.312,-.415); V.lineTo(.041,-.276); strk(DK,.074);
+  V.beginPath(); V.arc(0,.161,.139,3.5,6); strk(DK,.062);
+  return heroCache[k]=c;
+}
+
+// le fusil a pompe, canon vers la droite, pivot sur la crosse.
+function mkGun(){
+  var c=offc(54,28,2,14,1);
+  rct(0,-6,44,11,4,OUT);
+  rct(2,-4,40,8,3,'#565073'); rct(3,-4,38,3,2,'#9a93c0');
+  rct(38,-6,10,12,3,'#2b2740');
+  rct(14,4,16,7,3,'#2b2740'); rct(15,4,14,2,1,'#565073');
+  rct(0,-2,10,10,3,'#2b2740');
+  return c;
+}
+
+// floor tiles and blood: pretty on top, filthy underneath.
+function mulb(s){ return function(){ s|=0; s=s+0x6D2B79F5|0;
+  var t=Math.imul(s^s>>>15,1|s); t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296; }; }
+
+// ---------- bestiary ----------
+// name, body, light, mane, dark-mane, pixel scale, hp, speed, radius, xp
+var ET=[
+ ['FOAL',     '#ff9fd4','#d96eb0','#ff3f9e','#d61f7a', 2,   4, 132, 12, 1],
+ ['UNICORN',  '#b483e8','#8f5cc9','#ff5fc0','#d63f9e', 3,  13,  86, 19, 2],
+ ['GLITTER',  '#7fe5c6','#4fbfa0','#ff7fbf','#d65f9e', 3,  12,  95, 19, 3],
+ ['REARER',   '#f5c78e','#d29e63','#7fd8e0','#4fa8b8', 3,  20,  70, 21, 3],
+ ['SPITTER',  '#d3aef2','#a97fd0','#7f9fff','#4f6fd6', 3,  16,  66, 19, 4],
+ ['BLINKER',  '#ffb3b3','#d98080','#ffd257','#d6a02e', 3,  17,  84, 19, 4],
+ ['MOTHER',   '#9fd4ff','#6ea8d9','#c07fff','#8f3fd6', 4,  40,  58, 27, 6]];
+var eSpr=ET.map(function(t){ return mkUni(t[1],t[2],t[3],t[4]); });
+
+/* =====================================================================
+   QUATRE ECRANS TITRE
+   Chacun recoit (W,H,T,cx) et dessine tout: fond, personnages, titre.
+   Le titre et la tagline sont GROS partout: c'est la consigne.
+   ===================================================================== */
+var HR=120;
+var tHead=[mkHead('#a8ecdc','#6fc9b8','#ffb3e0','#c97fb0',1,HR),
+           mkHead('#f5c4ff','#c08fd6','#a8e8dc','#6fb8c9',1,HR),
+           mkHead('#d9b8ff','#a88fd6','#ffc4a8','#d69f7f',1,HR),
+           mkHead('#ffe0b8','#d6b88f','#ffb3d9','#7fd6c9',1,HR)];
+var X;
+function spark(x,y,r,c){ X.fillStyle=c; X.beginPath();
+  X.moveTo(x,y-r); X.quadraticCurveTo(x,y,x+r,y); X.quadraticCurveTo(x,y,x,y+r);
+  X.quadraticCurveTo(x,y,x-r,y); X.quadraticCurveTo(x,y,x,y-r); X.fill(); }
+var STARS=(function(){ var r=mulb(11), a=[], i;
+  for(i=0;i<110;i++) a.push([r(),r(),r()*2.2+0.7,r()]); return a; })();
+var CROWD=(function(){ var r=mulb(5), a=[], i;
+  for(i=0;i<60;i++) a.push([r(),r(),r()*7|0,r()*9,r()<.5?1:-1]); return a; })();
+
+/* le titre en sept couleurs, cerne de noir, avec halo */
+function bigTitle(cx,y,fs,glow){
+  X.textAlign='left'; X.font='bold '+fs+'px monospace';
+  var t='ROYGBIV', tw=X.measureText(t).width, ox=cx-tw/2, i;
+  for(i=0;i<7;i++){ var ch=t.charAt(i), cw=X.measureText(ch).width;
+    X.lineWidth=fs*0.16; X.lineJoin='round'; X.strokeStyle=OUT; X.strokeText(ch,ox,y);
+    X.shadowColor=BAND[i]; X.shadowBlur=glow; X.fillStyle=BAND[i];
+    X.fillText(ch,ox,y); X.shadowBlur=0; ox+=cw; }
+  X.textAlign='center';
+}
+/* texte cerne, lisible sur n'importe quel fond */
+function otext(t,x,y,fs,c,bold){
+  X.font=(bold?'bold ':'')+fs+'px monospace'; X.textAlign='center';
+  X.lineWidth=fs*0.22; X.lineJoin='round'; X.strokeStyle=OUT;
+  X.strokeText(t,x,y); X.fillStyle=c; X.fillText(t,x,y);
+}
+function taglines(cx,y,W,gap){
+  // lignes courtes: elles tiennent en portrait et peuvent donc etre grosses
+  var f=mn(26,W/16), l=f*1.3;
+  otext('EVERYONE LOVES UNICORNS.',cx,y,f,'#fff');
+  otext('NOBODY WRITES A GOOD PART',cx,y+l,f,'#fff');
+  otext('FOR THE RAINBOW.',cx,y+l*2,f,'#fff');
+  otext('THAT CHANGES TONIGHT.',cx,y+l*3+gap,f*1.2,'#ffd42e',1);
+}
+function cta(cx,y,W,T){
+  X.globalAlpha=0.55+0.45*sin(T*4);
+  otext('CLICK TO LOAD THE SHOTGUN',cx,y,mn(24,W/22),'#fff',1);
+  X.globalAlpha=1;
+}
+function hero(cx,cy,size,glowc,rot){
+  var hs=heroSpr(7,7,150), sc=size/(150*2.06);
+  X.save(); X.translate(cx,cy); if(rot) X.rotate(rot); X.scale(sc,sc);
+  if(glowc){ X.shadowColor=glowc; X.shadowBlur=50; }
+  X.drawImage(hs,-hs.ox,-hs.oy); X.shadowBlur=0; X.restore();
+}
+function head(i,x,y,size,rot,flip,lg){
+  var hd=tHead[i], k=size/(HR*1.32);
+  X.save(); X.translate(x,y+lg*3); X.scale(flip?-1:1,1); X.rotate(rot+lg*0.05);
+  X.scale(k,k); X.drawImage(hd,-hd.ox,-hd.oy); X.restore();
+}
+function field(W,H){
+  var g=X.createRadialGradient(W/2,H/2,60,W/2,H/2,Math.max(W,H)*.85);
+  g.addColorStop(0,'#4c8f63'); g.addColorStop(1,'#3f7a55');
+  X.fillStyle=g; X.fillRect(0,0,W,H);
+}
+function night(W,H,T){
+  var g=X.createRadialGradient(W/2,H/2,60,W/2,H/2,Math.max(W,H)*.85);
+  g.addColorStop(0,'#241040'); g.addColorStop(1,'#12061f');
+  X.fillStyle=g; X.fillRect(0,0,W,H);
+  for(var i=0;i<STARS.length;i++){ var st=STARS[i];
+    X.globalAlpha=0.25+0.6*Math.abs(sin(T*1.5+st[3]*9));
+    X.fillStyle=st[3]<0.55?'#fff':'#e6a8ff';
+    X.fillRect(st[0]*W,st[1]*H,st[2],st[2]); }
+  X.globalAlpha=1;
+}
+
+var TITRES=[
+{
+ n:'A / LE JURY',
+ d:'Les quatre tetes en rang au sommet, penchees sur toi comme un tribunal, un cone de lumiere qui tombe sur toi seul en bas. <b>Le plus theatral.</b> Tout le milieu est libre pour un titre enorme.',
+ f:function(W,H,T){
+  var cx=W/2, m=mn(W,H); night(W,H,T);
+  // le cone de lumiere
+  X.save(); X.globalCompositeOperation='lighter';
+  var lg=X.createLinearGradient(0,0,0,H);
+  lg.addColorStop(0,'rgba(255,240,200,0.18)'); lg.addColorStop(1,'rgba(255,240,200,0)');
+  X.fillStyle=lg; X.beginPath(); X.moveTo(cx-m*0.06,0); X.lineTo(cx+m*0.06,0);
+  X.lineTo(cx+m*0.42,H); X.lineTo(cx-m*0.42,H); X.closePath(); X.fill(); X.restore();
+  // le jury
+  var hw=mn(W*0.22,H*0.16);
+  for(var i=0;i<4;i++){ var x=W*(0.14+i*0.24), lg2=sin(T*7+i*1.7);
+    head(i,x,H*0.1,hw,(i<2?0.55:-0.55),i>1,lg2); }
+  // toi, tout en bas dans la lumiere
+  hero(cx,H*0.8,m*0.26,'#ffe9a0',0);
+  bigTitle(cx,H*0.44,mn(120,W/6.2),30);
+  taglines(cx,H*0.44+mn(40,W/14),W,10);
+  cta(cx,H-30,W,T);
+ }
+},
+{
+ n:'B / LA MEUTE',
+ d:'Une foule de licornes entieres qui trottent dans le champ derriere toi, toutes tournees vers toi. Tu es seul au milieu avec le fusil. <b>Le plus fidele au jeu</b>, et il annonce la horde.',
+ f:function(W,H,T){
+  var cx=W/2, cy=H*0.52, m=mn(W,H); field(W,H);
+  for(var i=0;i<CROWD.length;i++){ var c=CROWD[i],
+      x=c[0]*W, y=c[1]*H, sp=eSpr[c[2]], sc=(0.55+c[1]*0.6)*m/900;
+    var d=Math.hypot(x-cx,y-cy); if(d<m*0.2) continue;   // le cercle vide autour de toi
+    var pose=(T*7+c[3]|0)&1, bob=sin(T*8+c[3])*2;
+    X.save(); X.translate(x,y+bob); X.scale(x<cx?1:-1,1); X.scale(sc,sc);
+    X.globalAlpha=0.45+c[1]*0.55;
+    X.drawImage(sp,-sp.width/2,-sp.height/2); X.restore(); }
+  X.globalAlpha=1;
+  // un voile sombre pour poser le texte
+  X.fillStyle='rgba(6,2,12,0.42)'; X.fillRect(0,0,W,H*0.36);
+  hero(cx,cy+m*0.02,m*0.3,'#c04ff0',0);
+  bigTitle(cx,H*0.15,mn(120,W/6.2),26);
+  taglines(cx,H*0.15+mn(40,W/14),W,8);
+  cta(cx,H-30,W,T);
+ }
+},
+{
+ n:'C / L\'ENSEIGNE',
+ d:'Nuit, et le titre en <b>enseigne neon geante</b> qui grezille, avec une seule tete de licorne qui se penche d un coin pour se moquer. Toi en contre-jour devant l enseigne. Minimal, tres lisible, tres affiche.',
+ f:function(W,H,T){
+  var cx=W/2, m=mn(W,H); night(W,H,T);
+  // grezillement: une lettre lache de temps en temps
+  var fl=(sin(T*23)*sin(T*7.3)>0.85)?0.35:1;
+  X.globalAlpha=fl;
+  bigTitle(cx,H*0.36,mn(150,W/5.2),60);
+  X.globalAlpha=1;
+  // le halo de l'enseigne sur le sol
+  var rg=X.createRadialGradient(cx,H*0.36,10,cx,H*0.36,m*0.7);
+  rg.addColorStop(0,'rgba(192,79,240,0.22)'); rg.addColorStop(1,'rgba(0,0,0,0)');
+  X.fillStyle=rg; X.fillRect(0,0,W,H);
+  // une seule licorne, enorme, qui se penche du coin haut-droit
+  head(1,W*0.9,H*0.08,mn(W*0.4,H*0.26),-0.5,1,sin(T*7));
+  // toi, en ombre chinoise, dos a l'enseigne
+  hero(cx,H*0.66,m*0.34,0,0);
+  X.save(); X.globalCompositeOperation='multiply';
+  X.fillStyle='rgba(20,8,40,0.55)';
+  var hs=heroSpr(7,7,150), sc=m*0.34/(150*2.06);
+  X.translate(cx,H*0.66); X.scale(sc,sc); X.drawImage(hs,-hs.ox,-hs.oy); X.restore();
+  taglines(cx,H*0.84,W,6);
+  cta(cx,H-30,W,T);
+ }
+},
+{
+ n:'D / L\'AFFICHE',
+ d:'Toi en tres gros au premier plan, fusil brandi vers l ecran, eclair de bouche qui eclaire la scene, et les quatre tetes qui fuient sur les bords avec des lignes de vitesse. <b>Le plus agressif</b>, le titre en diagonale par-dessus.',
+ f:function(W,H,T){
+  var cx=W/2, cy=H*0.55, m=mn(W,H); field(W,H);
+  // lignes de vitesse depuis le centre
+  X.save(); X.globalAlpha=0.16; X.strokeStyle='#fff'; X.lineWidth=3;
+  for(var i=0;i<28;i++){ var a=i/28*TAU+T*0.15;
+    X.beginPath(); X.moveTo(cx+cos(a)*m*0.26,cy+sin(a)*m*0.26);
+    X.lineTo(cx+cos(a)*m*1.2,cy+sin(a)*m*1.2); X.stroke(); }
+  X.restore();
+  // l'eclair de bouche qui eclaire tout
+  var k=Math.abs(sin(T*9))>0.7?1:0;
+  if(k){ X.save(); X.globalCompositeOperation='lighter';
+    var rg=X.createRadialGradient(cx,cy,10,cx,cy,m*0.6);
+    rg.addColorStop(0,'rgba(255,220,120,0.5)'); rg.addColorStop(1,'rgba(0,0,0,0)');
+    X.fillStyle=rg; X.fillRect(0,0,W,H); X.restore(); }
+  // les tetes qui fuient, rognees par les bords, tournees vers l'exterieur
+  var hw=mn(W*0.26,H*0.18);
+  head(0,W*0.06,H*0.22,hw,-0.9,1,sin(T*7));
+  head(1,W*0.94,H*0.2,hw,0.9,0,sin(T*7+1));
+  head(2,W*0.05,H*0.82,hw,0.9,1,sin(T*7+2));
+  head(3,W*0.95,H*0.84,hw,-0.9,0,sin(T*7+3));
+  // toi, enorme, avec un fusil pointe vers l'ecran
+  hero(cx,cy+m*0.04,m*0.46,'#ffd42e',0.06);
+  // le titre en diagonale, par-dessus tout
+  X.save(); X.translate(cx,H*0.2); X.rotate(-0.09);
+  bigTitle(0,0,mn(130,W/5.6),34); X.restore();
+  taglines(cx,H*0.2+mn(46,W/12),W,8);
+  cta(cx,H-30,W,T);
+ }
+}];
+
+/* =====================================================================
+   Affichage
+   ===================================================================== */
+var cv=document.getElementById('c'), W, H, T=0, ANIM=1, SOLO=-1, PORTRAIT=0;
+function resize(){ var d=devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=r.width*d; cv.height=r.height*d;
+  X=cv.getContext('2d'); X.setTransform(d,0,0,d,0,0); W=r.width; H=r.height; }
+addEventListener('resize',resize);
+document.getElementById('anim').onchange=function(){ ANIM=this.checked?1:0; };
+document.getElementById('port').onchange=function(){ PORTRAIT=this.checked?1:0; };
+var back=document.getElementById('back');
+back.onclick=function(){ SOLO=-1; back.style.display='none'; note(); };
+function cellRect(i){ var cw=W/2, ch=H/2; return [(i%2)*cw,((i/2)|0)*ch,cw,ch]; }
+cv.onclick=function(e){ if(SOLO>=0) return;
+  var r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  for(var i=0;i<4;i++){ var b=cellRect(i);
+    if(x>b[0]&&x<b[0]+b[2]&&y>b[1]&&y<b[1]+b[3]){ SOLO=i; back.style.display=''; note(); return; } } };
+function note(){ document.getElementById('note').innerHTML = SOLO<0
+  ? 'Clique un ecran pour le voir en grand. La case <b>portrait</b> simule un telephone tenu droit, le cas le plus contraint.'
+  : '<b>'+TITRES[SOLO].n+'</b> &nbsp; '+TITRES[SOLO].d; }
+
+/* dessine une variante dans un rectangle, en simulant un ecran de w x h */
+function drawIn(i,x,y,w,h){
+  var vw=w, vh=h;
+  if(PORTRAIT){ vw=mn(w,h*0.46); }               // 9:19.5
+  var ox=x+(w-vw)/2;
+  X.save(); X.beginPath(); X.rect(ox,y,vw,vh); X.clip(); X.translate(ox,y);
+  V=X; TITRES[i].f(vw,vh,T); X.restore();
+  X.strokeStyle='rgba(255,255,255,0.25)'; X.strokeRect(ox+0.5,y+0.5,vw,vh);
+}
+var last=0;
+function frame(ts){ var dt=mn(.05,(ts-last)/1000||0); last=ts; if(ANIM) T+=dt;
+  X.fillStyle='#0a0412'; X.fillRect(0,0,W,H);
+  if(SOLO>=0) drawIn(SOLO,8,8,W-16,H-16);
+  else for(var i=0;i<4;i++){ var b=cellRect(i);
+    drawIn(i,b[0]+6,b[1]+6,b[2]-12,b[3]-12);
+    X.fillStyle='#ffc61e'; X.font='bold 13px monospace'; X.textAlign='left';
+    X.fillText(TITRES[i].n,b[0]+14,b[1]+22); }
+  requestAnimationFrame(frame);
+}
+resize(); note(); requestAnimationFrame(frame);
+</script></html>

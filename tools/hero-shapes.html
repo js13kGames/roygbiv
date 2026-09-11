@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROYGBIV / quatre arcs-en-ciel</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#12061f;color:#c8b0e8;overflow:hidden;
+    font:12px/1.45 ui-monospace,Menlo,Consolas,monospace}
+  #bar{padding:8px 12px;background:#1c0c2e;border-bottom:1px solid #3a1c5c;
+    display:flex;gap:15px;align-items:center;flex-wrap:wrap;position:relative;z-index:2}
+  #bar b{color:#ffc61e;letter-spacing:2px}
+  label{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+  input[type=range]{width:120px;accent-color:#c04ff0}
+  button{background:#3a1c5c;color:#e8d8ff;border:1px solid #6b3fa0;border-radius:4px;
+    padding:5px 9px;cursor:pointer;font:inherit}
+  button:hover{background:#4d2578}
+  canvas{display:block;width:100%;cursor:pointer}
+  #wrap{height:100%;display:flex;flex-direction:column}
+  #note{position:absolute;left:0;right:0;bottom:0;padding:9px 14px;
+    background:linear-gradient(transparent,#0d0518 60%);pointer-events:none}
+  #note b{color:#ffc61e}
+</style>
+<div id="wrap">
+  <div id="bar">
+    <b>QUATRE ARCS-EN-CIEL</b>
+    <label>bandes peintes <input id="lit" type="range" min="0" max="7" step="1" value="7"></label>
+    <span id="litv">7</span>
+    <label>bandes debloquees <input id="lvl" type="range" min="0" max="7" step="1" value="7"></label>
+    <span id="lvlv">7</span>
+    <label><input id="gun" type="checkbox" checked> fusil</label>
+    <label><input id="anim" type="checkbox" checked> anim</label>
+    <button id="back" style="display:none">tout voir</button>
+  </div>
+  <canvas id="c" style="flex:1;min-height:0"></canvas>
+</div>
+<div id="note"></div>
+<script>
+/* =====================================================================
+   Quatre silhouettes pour le heros de ROYGBIV.
+   Contrainte commune: le corps EST la barre de vie. Sept bandes.
+   Peinte = pouvoir actif. Grise = debloquee mais perdue. Noire = pas
+   encore debloquee. On perd toujours la plus haute (ou la plus interne)
+   en premier, donc la meilleure carte part la premiere.
+   Outil de dev, ne part pas dans le zip.
+   ===================================================================== */
+
+var OUT='#150719', DK='#1a0b2b', TAU=6.2832, PI=Math.PI;
+var BAND=['#ff3355','#ff8a1f','#ffd42e','#5ce24a','#2fb8ff','#4a5cff','#a33bff'];
+var GRAY=['#4a4358','#514a60','#585167','#4f4a5e','#464154','#413c50','#3b3648'];
+var VIDE='#2a2140';
+var cos=Math.cos, sin=Math.sin;
+
+/* ---------- primitives, identiques a celles du jeu ------------------- */
+var V;
+function el(x,y,rx,ry,c,rot){ V.save(); V.translate(x,y); if(rot) V.rotate(rot);
+  V.scale(rx,ry); V.beginPath(); V.arc(0,0,1,0,TAU); V.restore(); V.fillStyle=c; V.fill(); }
+function elo(x,y,rx,ry,c,o){ o=o===undefined?.045:o; el(x,y,rx+o,ry+o,OUT); el(x,y,rx,ry,c); }
+function rct(x,y,w,h,r,c){ V.beginPath(); V.moveTo(x+r,y);
+  V.arcTo(x+w,y,x+w,y+h,r); V.arcTo(x+w,y+h,x,y+h,r);
+  V.arcTo(x,y+h,x,y,r); V.arcTo(x,y,x+w,y,r); V.closePath(); V.fillStyle=c; V.fill(); }
+function strk(c,w){ V.strokeStyle=c; V.lineWidth=w; V.lineCap='round'; V.stroke(); }
+function eyeq(x,y,r,lk){ elo(x,y,r,r*1.05,'#fff',.03);
+  el(x+lk*r*.3,y+r*.12,r*.52,r*.62,DK);
+  el(x+lk*r*.3-r*.16,y-r*.18,r*.19,r*.19,'#fff'); }
+/* couleur d'une bande selon son etat */
+function bc(i,li,lv){ return i<li?BAND[i] : (i<lv?GRAY[i]:VIDE); }
+/* le visage furieux, a l'echelle demandee */
+function face(y,s){
+  eyeq(-.2*s,y,.16*s,0); eyeq(.2*s,y,.16*s,0);
+  V.beginPath(); V.moveTo(-.38*s,y-.26*s); V.lineTo(-.05*s,y-.09*s); strk(DK,.09*s);
+  V.beginPath(); V.moveTo(.38*s,y-.26*s); V.lineTo(.05*s,y-.09*s); strk(DK,.09*s);
+  V.beginPath(); V.arc(0,y+.44*s,.17*s,3.5,6); strk(DK,.075*s);
+}
+/* deux pattes rondes */
+function legs(y,w,c){ rct(-w-.05,y,w,.3,.11,c); rct(.05,y,w,.3,.11,c); }
+/* le fusil a pompe, tenu vers la droite */
+function gun(y){
+  V.save(); V.translate(0,y);
+  rct(.25,-.13,1.02,.24,.07,OUT);
+  rct(.3,-.09,.94,.16,.05,'#565073'); rct(.32,-.09,.9,.05,.03,'#9a93c0');
+  rct(1.16,-.14,.16,.26,.05,'#2b2740');
+  rct(.58,.05,.34,.14,.05,'#2b2740');
+  V.restore();
+}
+
+/* =====================================================================
+   LES QUATRE. Chacune dessine centree en 0, dans un carre [-1,1].
+   ===================================================================== */
+var FORMES=[
+{
+ n:'A / ACTUEL',
+ d:'La forme du jeu aujourd hui. Cotes droits, sommet arrondi, base large. <b>Elle lit tres bien</b> et les sept bandes sont de meme epaisseur, mais la silhouette tient plus de la pierre tombale que de l arc-en-ciel.',
+ f:function(li,lv,t){
+  el(0,.95,.62,.18,'rgba(0,0,0,.45)');
+  legs(.62,.24,li>0?BAND[0]:GRAY[0]);
+  V.save();
+  V.beginPath(); V.moveTo(-.66,.78); V.lineTo(-.66,-.1);
+  V.arc(0,-.1,.66,PI,0); V.lineTo(.66,.78); V.closePath();
+  V.fillStyle=OUT; V.fill();
+  V.beginPath(); V.moveTo(-.6,.72); V.lineTo(-.6,-.1);
+  V.arc(0,-.1,.6,PI,0); V.lineTo(.6,.72); V.closePath(); V.clip();
+  for(var i=0;i<7;i++){ V.fillStyle=bc(i,li,lv);
+    V.fillRect(-.62,.72-(i+1)*.213,1.24,.218); }
+  V.restore();
+  face(-.1,1);
+ }
+},
+{
+ n:'B / ARCHE HAUTE',
+ d:'Meme construction, mais <b>plus etroite et plus haute</b>, avec un sommet vraiment demi-circulaire et des pattes plus longues. C est le U inverse le moins risque: rien ne change dans la logique du jeu, seules les proportions bougent.',
+ f:function(li,lv,t){
+  el(0,1.0,.5,.16,'rgba(0,0,0,.45)');
+  legs(.72,.2,li>0?BAND[0]:GRAY[0]);
+  V.save();
+  V.beginPath(); V.moveTo(-.53,.86); V.lineTo(-.53,-.32);
+  V.arc(0,-.32,.53,PI,0); V.lineTo(.53,.86); V.closePath();
+  V.fillStyle=OUT; V.fill();
+  V.beginPath(); V.moveTo(-.47,.8); V.lineTo(-.47,-.32);
+  V.arc(0,-.32,.47,PI,0); V.lineTo(.47,.8); V.closePath(); V.clip();
+  for(var i=0;i<7;i++){ V.fillStyle=bc(i,li,lv);
+    V.fillRect(-.5,.8-(i+1)*.187,1,.192); }
+  V.restore();
+  face(.14,.86);
+ }
+},
+{
+ n:'C / ARCHE EVIDEE',
+ d:'Le vrai arc-en-ciel: un anneau epais avec <b>un trou dessous</b>, sept bandes concentriques, rouge a l exterieur et violet a l interieur. La plus juste, mais chaque bande devient un arc fin, et le visage doit se poser sur la couronne.',
+ f:function(li,lv,t){
+  var R=.98, r0=.44, e=(R-r0)/7,
+      fx=(R+r0)/2, fw=.44,                 // un pied sous chaque jambe
+      lc=li>0?BAND[0]:GRAY[0];
+  el(-fx,.99,.28,.09,'rgba(0,0,0,.4)'); el(fx,.99,.28,.09,'rgba(0,0,0,.4)');
+  rct(-fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);
+  rct(fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);
+  rct(-fx-fw/2,.54,fw,.36,.13,lc);
+  rct(fx-fw/2,.54,fw,.36,.13,lc);
+  V.beginPath(); V.arc(0,.62,R+.05,PI,0); V.arc(0,.62,r0-.05,0,PI,1);
+  V.closePath(); V.fillStyle=OUT; V.fill();
+  for(var i=0;i<7;i++){
+    var ro=R-i*e, ri=ro-e;
+    V.beginPath(); V.arc(0,.62,ro,PI,0); V.arc(0,.62,ri,0,PI,1);
+    V.closePath(); V.fillStyle=bc(i,li,lv); V.fill(); }
+  V.save(); V.translate(0,-.2); face(0,.82); V.restore();
+ }
+},
+{
+ n:'D / DEMI-DISQUE',
+ d:'Un demi-disque plein a bandes concentriques, pose sur ses pattes. <b>La silhouette la plus reconnaissable</b> de loin, celle de l emoji. Le visage occupe le coeur, donc il mange les deux bandes les plus internes.',
+ f:function(li,lv,t){
+  el(0,.92,.66,.16,'rgba(0,0,0,.45)');
+  legs(.56,.24,li>0?BAND[0]:GRAY[0]);
+  var R=1.0, e=R/7.6;
+  V.beginPath(); V.arc(0,.56,R+.05,PI,0); V.closePath(); V.fillStyle=OUT; V.fill();
+  for(var i=0;i<7;i++){
+    V.beginPath(); V.arc(0,.56,R-i*e,PI,0); V.closePath();
+    V.fillStyle=bc(i,li,lv); V.fill(); }
+  V.beginPath(); V.arc(0,.56,R-7*e,PI,0); V.closePath();
+  V.fillStyle=li>6?'#ffe9ff':'#3a3450'; V.fill();
+  face(.08,.92);
+ }
+}];
+
+/* =====================================================================
+   Affichage
+   ===================================================================== */
+var cv=document.getElementById('c'), X, W, H, T=0;
+var LIT=7, LVL=7, GUN=1, ANIM=1, SOLO=-1;
+function resize(){ var d=devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=r.width*d; cv.height=r.height*d;
+  X=cv.getContext('2d'); X.setTransform(d,0,0,d,0,0); W=r.width; H=r.height; }
+addEventListener('resize',resize);
+
+function bind(id,f){ document.getElementById(id).oninput=
+  document.getElementById(id).onchange=f; }
+bind('lit',function(){ LIT=+this.value; document.getElementById('litv').textContent=LIT;
+  if(LVL<LIT){ LVL=LIT; document.getElementById('lvl').value=LVL;
+    document.getElementById('lvlv').textContent=LVL; } });
+bind('lvl',function(){ LVL=+this.value; document.getElementById('lvlv').textContent=LVL;
+  if(LIT>LVL){ LIT=LVL; document.getElementById('lit').value=LIT;
+    document.getElementById('litv').textContent=LIT; } });
+bind('gun',function(){ GUN=this.checked?1:0; });
+bind('anim',function(){ ANIM=this.checked?1:0; });
+var back=document.getElementById('back');
+back.onclick=function(){ SOLO=-1; back.style.display='none'; note(); };
+
+function cellRect(i){ var cw=W/(W>760?4:2), ch=H/(W>760?1:2);
+  var n=W>760?4:2;
+  return [ (i%n)*cw, ((i/n)|0)*ch, cw, ch ]; }
+cv.onclick=function(e){
+  if(SOLO>=0) return;
+  var r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  for(var i=0;i<4;i++){ var b=cellRect(i);
+    if(x>b[0]&&x<b[0]+b[2]&&y>b[1]&&y<b[1]+b[3]){
+      SOLO=i; back.style.display=''; note(); return; } }
+};
+function note(){ document.getElementById('note').innerHTML = SOLO<0
+  ? 'Bouge les curseurs: <b>bandes peintes</b> = pouvoirs actifs, <b>debloquees</b> = niveau atteint. Clique une forme pour la voir en grand.'
+  : '<b>'+FORMES[SOLO].n+'</b> &nbsp; '+FORMES[SOLO].d; }
+
+function bg(){ var g=X.createRadialGradient(W/2,H/2,60,W/2,H/2,Math.max(W,H)*.85);
+  g.addColorStop(0,'#4c8f63'); g.addColorStop(1,'#3f7a55');
+  X.fillStyle=g; X.fillRect(0,0,W,H); }
+
+function draw(i,cx,cy,s){
+  V=X; X.save(); X.translate(cx,cy+(ANIM?sin(T*4+i)*3:0)); X.scale(s,s);
+  if(GUN){ X.save(); X.rotate(ANIM?sin(T*1.3)*.5:0); gun(0); X.restore(); }
+  FORMES[i].f(LIT,LVL,T);
+  X.restore(); }
+
+var last=0;
+function frame(ts){ var dt=Math.min(.05,(ts-last)/1000||0); last=ts;
+  if(ANIM) T+=dt;
+  bg();
+  if(SOLO>=0){ draw(SOLO,W/2,H*.48,Math.min(W,H)*.3);
+  } else {
+    for(var i=0;i<4;i++){ var b=cellRect(i);
+      draw(i,b[0]+b[2]/2,b[1]+b[3]*.52,Math.min(b[2],b[3])*.26);
+      X.fillStyle='#ffe9c0'; X.font='bold 13px ui-monospace,monospace';
+      X.textAlign='center'; X.fillText(FORMES[i].n,b[0]+b[2]/2,b[1]+22);
+      X.strokeStyle='rgba(0,0,0,.25)'; X.strokeRect(b[0]+.5,b[1]+.5,b[2],b[3]); }
+    X.textAlign='left';
+  }
+  requestAnimationFrame(frame);
+}
+resize(); note(); requestAnimationFrame(frame);
+</script>
+</html>

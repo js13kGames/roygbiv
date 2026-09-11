@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROYGBIV / six boss</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#12061f;color:#c8b0e8;overflow:hidden;
+    font:12px/1.45 ui-monospace,Menlo,Consolas,monospace}
+  #bar{padding:8px 12px;background:#1c0c2e;border-bottom:1px solid #3a1c5c;
+    display:flex;gap:16px;align-items:center;flex-wrap:wrap;position:relative;z-index:2}
+  #bar b{color:#ffc61e;letter-spacing:2px}
+  label{display:flex;gap:6px;align-items:center;cursor:pointer;user-select:none}
+  input[type=range]{width:130px;accent-color:#c04ff0}
+  button{background:#3a1c5c;color:#e8d8ff;border:1px solid #6b3fa0;border-radius:4px;
+    padding:5px 9px;cursor:pointer;font:inherit}
+  button:hover{background:#4d2578}
+  canvas{display:block;width:100%;cursor:pointer}
+  #wrap{height:100%;display:flex;flex-direction:column}
+  #note{position:absolute;left:0;right:0;bottom:0;padding:8px 14px;
+    background:linear-gradient(transparent,#0d0518 55%);pointer-events:none;font-size:12px}
+  #note b{color:#ffc61e}
+</style>
+<div id="wrap">
+  <div id="bar">
+    <b>SIX BOSS</b>
+    <label>meches restantes <input id="mane" type="range" min="0" max="7" step="1" value="7"></label>
+    <span id="manev">7</span>
+    <label><input id="anim" type="checkbox" checked> anim</label>
+    <button id="back" style="display:none">tout voir</button>
+    <span style="opacity:.6">clique un boss pour le voir en grand</span>
+  </div>
+  <canvas id="c" style="flex:1;min-height:0"></canvas>
+</div>
+<div id="note"></div>
+<script>
+/* =====================================================================
+   Six silhouettes de boss pour ROYGBIV.
+   Toutes respectent la regle du jeu: la criniere est faite de 7 meches
+   arc-en-ciel volees, et ces 7 meches SONT les points de vie. Une meche
+   arrachee eteint une tete et change le comportement.
+   Outil de dev, ne part pas dans le zip.
+   ===================================================================== */
+
+var OUT='#150719', HORN='#ffd257', HORNH='#fff2b8', DK='#1a0b2b';
+var BAND=['#ff3355','#ff8a1f','#ffd42e','#5ce24a','#2fb8ff','#4a5cff','#a33bff'];
+var GRAY=['#4a4358','#514a60','#585167','#4f4a5e','#464154','#413c50','#3b3648'];
+var FLESH='#c79ceb', FL2='#a87fd6', FL3='#8f5cc9';
+var PATCH=['#8fe8c8','#ffd9a0','#a8c8ff','#ffb3d9'];
+var TAU=6.2832, cos=Math.cos, sin=Math.sin, abs=Math.abs;
+
+/* ---------- primitives, identiques a celles du jeu ------------------- */
+var V;
+function el(x,y,rx,ry,c,rot){ V.save(); V.translate(x,y); if(rot) V.rotate(rot);
+  V.scale(rx,ry); V.beginPath(); V.arc(0,0,1,0,TAU); V.restore(); V.fillStyle=c; V.fill(); }
+function elo(x,y,rx,ry,c,o){ o=o===undefined?.045:o; el(x,y,rx+o,ry+o,OUT); el(x,y,rx,ry,c); }
+function rct(x,y,w,h,r,c){ V.beginPath(); V.moveTo(x+r,y);
+  V.arcTo(x+w,y,x+w,y+h,r); V.arcTo(x+w,y+h,x,y+h,r);
+  V.arcTo(x,y+h,x,y,r); V.arcTo(x,y,x+w,y,r); V.closePath(); V.fillStyle=c; V.fill(); }
+function tri(ax,ay,bx,by,cx,cy,c){ V.beginPath(); V.moveTo(ax,ay);
+  V.lineTo(bx,by); V.lineTo(cx,cy); V.closePath(); V.fillStyle=c; V.fill(); }
+function strk(c,w){ V.strokeStyle=c; V.lineWidth=w; V.lineCap='round'; V.stroke(); }
+function eyeq(x,y,r,lk){ elo(x,y,r,r*1.05,'#fff',.03);
+  el(x+lk*r*.3,y+r*.12,r*.52,r*.62,DK);
+  el(x+lk*r*.3-r*.16,y-r*.18,r*.19,r*.19,'#fff'); }
+
+/* une tete de licorne, geometrie exacte du jeu. lg = elle se marre. */
+function hd(x,y,s,b,sh,m,md,lg,rot,lk,dead){
+  V.save(); V.translate(x,y); if(rot) V.rotate(rot); V.scale(s,s);
+  for(var i=0;i<5;i++){ var a=3.3+i*.34;
+    el(cos(a)*.62,sin(a)*.66,.28-i*.02,.3-i*.02,i%2?m:md); }
+  elo(0,0,.585,.575,b,.03);
+  el(.35,.325,.39,.28,b); el(.43,.345,.32,.221,'rgba(255,255,255,.3)');
+  el(.6,.18,.05,.06,sh);
+  tri(-.08,-.477,.24,-.443,.14,-1.2,OUT);
+  tri(-.04,-.494,.2,-.46,.13,-1.12,HORN);
+  tri(.02,-.494,.08,-.477,.11,-.941,HORNH);
+  if(dead){
+    xEye(-.18,-.095,.2); xEye(.305,-.16,.175);        // les yeux en croix
+    V.beginPath(); V.arc(.4,.5,.19,3.5,5.9); strk(DK,.1);  // bouche tombante
+    el(.62,.42,.09,.14,'#ff5f8f',.4);                 // la langue qui pend
+  } else {
+    eyeq(-.18,-.095,.24,lk===undefined?1:lk);
+    eyeq(.305,-.16,.21,lk===undefined?1:lk);
+    el(-.09,.3,.13,.09,'#ff6fa8');
+    if(lg>.1){ elo(.365,.34,.29,.19+lg*.12,'#3a1030',.03);
+      el(.365,.44,.14,.08,'#ff5f8f');
+      V.fillStyle='#fff'; V.fillRect(.225,.12,.31,.066);
+      el(.38,.186,.155,.054,'#fff'); }
+    else { V.beginPath(); V.arc(.425,.27,.2,.2,2.6); strk(DK,.126); }
+  }
+  if(dead){ V.globalAlpha=.32; el(0,0,.62,.61,'#241033'); V.globalAlpha=1; }
+  V.restore();
+}
+
+/* deux traits croises a la place de l'oeil */
+function xEye(x,y,r){
+  V.beginPath(); V.moveTo(x-r,y-r); V.lineTo(x+r,y+r);
+  V.moveTo(x+r,y-r); V.lineTo(x-r,y+r); strk(DK,r*.42);
+}
+/* une meche volee: courbe epaisse, eteinte quand elle est arrachee */
+function strand(i,alive,x0,y0,x1,y1,cx,cy,w,glow){
+  if(alive&&glow){ V.shadowColor=BAND[i]; V.shadowBlur=glow; }
+  V.beginPath(); V.moveTo(x0,y0); V.quadraticCurveTo(cx,cy,x1,y1);
+  strk(alive?BAND[i]:GRAY[i], w); V.shadowBlur=0;
+}
+/* couture de Frankenstein */
+function seam(x,y,n,dx,dy,w){ V.beginPath();
+  for(var k=0;k<n;k++){ V.moveTo(x+k*dx,y+k*dy-w); V.lineTo(x+k*dx+dx*.5,y+k*dy+w); }
+  strk('#5a3a7a',.03); }
+
+/* =====================================================================
+   LES SIX. Chacune dessine dans un carre [-1,1], centree en 0.
+   ===================================================================== */
+var BOSS=[
+{
+ n:'FRANKENSTEIN', d:'Le boss actuel, mais nettoye. Quatre cous plantes dans un corps boursoufle, rustines cousues, meches plantees dans le dos. <b>Le plus lisible</b>, aussi le plus attendu.',
+ f:function(t,mane){
+  el(0,1.02,1.05,.2,'rgba(0,0,0,.45)');
+  rct(-.7,.42,.28,.56,.13,FL2); rct(-.28,.47,.28,.51,.13,FLESH);
+  rct(.14,.42,.28,.56,.13,FL2);  rct(.46,.47,.28,.51,.13,FLESH);
+  elo(0,.2,.88,.58,FLESH);
+  el(-.3,.3,.32,.24,PATCH[0]); el(.34,.12,.28,.22,PATCH[1]);
+  seam(-.6,.06,7,.14,.02,.07); seam(.06,.34,5,.13,-.02,.06);
+  for(var i=0;i<7;i++) strand(i,i<mane,-.12+i*.05,-.32,-.1+i*.24,-1.3,
+    -.5+i*.2,-1.05-sin(t*2+i)*.12,.11,18);
+  var hp=[[-.82,-.46,-.5],[-.28,-.72,-.2],[.28,-.72,.2],[.82,-.46,.5]];
+  for(var h=0;h<4;h++){ var p=hp[h], dd=mane<=h*1.75, lg=dd?0:abs(sin(t*9+h));
+    V.beginPath(); V.moveTo(p[0]*.5,.02); V.lineTo(p[0],p[1]+.26+(dd?.3:0)); strk(FLESH,.24);
+    hd(p[0],p[1]-lg*.05+(dd?.3:0),.58,FLESH,FL3,'#ff3fd0','#8a1f5e',lg,dd?p[2]*.7:0,p[2],dd); }
+ }
+},
+{
+ n:'HYDRE  (retenue)', d:'Corps compact, quatre cous serpentins tres longs qui ondulent et fouettent. Les meches jaillissent du centre comme une fontaine. <b>Silhouette la plus menacante</b>, mais les cous coutent cher a animer.',
+ f:function(t,mane){
+  el(0,1.0,.7,.16,'rgba(0,0,0,.45)');
+  for(var i=0;i<7;i++) strand(i,i<mane,0,-.1,cos(-1.6+i*.42)*1.05,-.35+sin(-1.6+i*.42)*1.05,
+    cos(-1.6+i*.42)*.5,-1.0+sin(t*2.2+i)*.14,.1,16);
+  var hp=[[-1,.5],[-.42,-.2],[.42,-.2],[1,.5]];
+  for(var h=0;h<4;h++){
+    var p=hp[h], dd=mane<=h*1.75, w=dd?0:sin(t*2.4+h*1.6)*.22,
+        lg=dd?0:abs(sin(t*8+h));
+    // un cou mort ne fouette plus: il retombe et pend
+    var ex=p[0]*(dd?1.12:(1+w*.2)), ey=(dd?.72:p[1]-.15+w*.3);
+    V.beginPath(); V.moveTo(0,.16);
+    V.bezierCurveTo(p[0]*.35,.4+w,p[0]*1.15,ey+.55,ex,ey+.18);
+    strk(OUT,.3);
+    V.beginPath(); V.moveTo(0,.16);
+    V.bezierCurveTo(p[0]*.35,.4+w,p[0]*1.15,ey+.55,ex,ey+.18);
+    strk(h%2?FLESH:FL2,.22);
+    hd(ex,ey,.46,FLESH,FL3,'#ff3fd0','#8a1f5e',lg,
+       dd?(p[0]<0?1.5:-1.5):(p[0]<0?.35:-.35), p[0]<0?-1:1, dd); }
+  elo(0,.42,.56,.44,FL2); el(0,.34,.4,.3,FLESH);
+  el(-.16,.4,.12,.1,PATCH[2]);
+ }
+},
+{
+ n:'CARROUSEL', d:'Un manege. Les quatre tetes sont empalees sur des barres de laiton autour d un mat, sous un chapiteau raye, et les meches pendent en rubans. <b>La plus originale</b>, celle qui ferait parler du jeu.',
+ f:function(t,mane){
+  el(0,1.05,.95,.18,'rgba(0,0,0,.45)');
+  el(0,.9,.86,.18,FL3); el(0,.86,.8,.15,FL2);      // plateau qui tourne
+  V.beginPath(); V.moveTo(-.06,-.5); V.lineTo(.06,-.5);
+  V.lineTo(.06,.86); V.lineTo(-.06,.86); V.closePath();
+  V.fillStyle='#d9c26a'; V.fill();                  // le mat
+  for(var i=0;i<7;i++){                             // rubans = meches
+    var a=-1.15+i*.38;
+    strand(i,i<mane,cos(a)*.12,-.62,cos(a)*.92,-.05+sin(t*2+i)*.06,
+      cos(a)*.6,-.5,.09,14); }
+  V.beginPath(); V.moveTo(-1.02,-.55); V.lineTo(1.02,-.55);
+  V.lineTo(0,-1.22); V.closePath(); V.fillStyle=OUT; V.fill();
+  for(var k=0;k<8;k++){                             // chapiteau raye
+    V.beginPath(); V.moveTo(-.94+k*.235,-.58); V.lineTo(-.94+(k+1)*.235,-.58);
+    V.lineTo(0,-1.16); V.closePath();
+    V.fillStyle=k%2?'#ff5f9e':'#fff2f8'; V.fill(); }
+  el(0,-1.24,.07,.09,HORN);
+  var hp=[[-.62,.28],[-.2,.44],[.2,.44],[.62,.28]];
+  for(var h=0;h<4;h++){ var p=hp[h], dd=mane<=h*1.75,
+      b=dd?.34:sin(t*2.6+h*1.57)*.13, lg=dd?0:abs(sin(t*9+h));
+    V.beginPath(); V.moveTo(p[0],-.5); V.lineTo(p[0],p[1]+.5+b);
+    strk('#d9c26a',.055);                            // la barre qui traverse
+    hd(p[0],p[1]+b,.44,FLESH,FL3,'#ff3fd0','#8a1f5e',lg,dd?.5:0,p[0]<0?-1:1,dd); }
+ }
+},
+{
+ n:'TOTEM', d:'Quatre tetes empilees en colonne, la plus grosse en bas, la criniere jaillit du sommet comme une couronne. <b>Tres lisible de loin</b>, occupe peu de largeur, ideal pour un ecran de telephone.',
+ f:function(t,mane){
+  el(0,1.05,.62,.15,'rgba(0,0,0,.45)');
+  rct(-.5,.82,.22,.24,.1,FL3); rct(.28,.82,.22,.24,.1,FL3);
+  elo(0,.72,.6,.34,FL2);
+  for(var i=0;i<7;i++){ var a=-2.5+i*.5;
+    strand(i,i<mane,0,-.9,cos(a)*.85,-1.15+sin(a)*.5,
+      cos(a)*.4,-1.5-sin(t*2.4+i)*.1,.1,18); }
+  var sz=[.56,.48,.42,.36], yy=[.6,.14,-.26,-.6];
+  for(var h=3;h>=0;h--){ var dd=mane<=h*1.75, lg=dd?0:abs(sin(t*8.5+h));
+    hd(0,yy[h]-lg*.03,sz[h],FLESH,FL3,'#ff3fd0','#8a1f5e',lg,
+       dd?.4:sin(t*1.4+h)*.09, h%2?1:-1, dd); }
+ }
+},
+{
+ n:'LA REINE', d:'Une seule licorne, enorme et royale, qui porte les trois autres tetes en trophee sur sa couronne. La criniere de sept meches lui fait une cape. <b>La plus classe</b>, la moins drole.',
+ f:function(t,mane){
+  el(0,1.04,1.0,.18,'rgba(0,0,0,.45)');
+  for(var i=0;i<7;i++){                             // la cape
+    var a=-2.75+i*.42;
+    strand(i,i<mane,cos(a)*.2,-.3,cos(a)*1.15,.55+sin(t*1.6+i)*.08,
+      cos(a)*.85,-.5,.14,16); }
+  rct(-.62,.5,.26,.5,.12,FL2); rct(-.24,.55,.26,.45,.12,FLESH);
+  rct(.02,.5,.26,.5,.12,FL2);  rct(.36,.55,.26,.45,.12,FLESH);
+  elo(0,.36,.72,.46,FLESH); el(0,.44,.56,.3,FL2);
+  hd(0,-.28,.86,FLESH,FL3,'#ff3fd0','#8a1f5e',
+     mane>0?abs(sin(t*7))*.6:0, sin(t*1.2)*.05, 0, mane<=0);
+  V.beginPath();                                     // la couronne
+  V.moveTo(-.5,-.78); V.lineTo(-.32,-1.02); V.lineTo(-.14,-.8);
+  V.lineTo(.06,-1.06); V.lineTo(.26,-.8); V.lineTo(.44,-1.02);
+  V.lineTo(.56,-.76); V.closePath(); V.fillStyle=HORN; V.fill();
+  var tp=[[-.42,-1.02],[.06,-1.16],[.5,-1.0]];
+  for(var h=0;h<3;h++){ var dd=mane<=(h+1)*1.75, lg=dd?0:abs(sin(t*9+h))*.5;
+    hd(tp[h][0],tp[h][1],.3,FLESH,FL3,'#ff3fd0','#8a1f5e',lg,
+       (h-1)*.3, h===1?0:(h?1:-1), dd); }
+ }
+},
+{
+ n:'ARAIGNEE', d:'Un corps large et bas sur huit pattes de licorne, quatre tetes plantees aux angles, la criniere en crete dorsale. <b>La plus degoutante</b>, et celle qui fait le plus peur au sol.',
+ f:function(t,mane){
+  el(0,1.0,1.18,.2,'rgba(0,0,0,.45)');
+  for(var k=0;k<8;k++){                              // les pattes
+    var s2=k<4?-1:1, j=k%4, bx=s2*(.42+j*.16), by=.18+j*.06,
+        kick=sin(t*5+k*.9)*.14;
+    V.beginPath(); V.moveTo(bx*.5,by);
+    V.quadraticCurveTo(bx*1.25,by-.28+kick,bx*1.45,by+.72);
+    strk(OUT,.17);
+    V.beginPath(); V.moveTo(bx*.5,by);
+    V.quadraticCurveTo(bx*1.25,by-.28+kick,bx*1.45,by+.72);
+    strk(k%2?FL2:FLESH,.11);
+    el(bx*1.45,by+.76,.07,.05,FL3); }
+  elo(0,.3,.95,.42,FLESH);
+  el(-.35,.34,.28,.2,PATCH[3]); el(.4,.24,.24,.18,PATCH[0]);
+  seam(-.7,.16,9,.16,.01,.06);
+  for(var i=0;i<7;i++)                                // crete dorsale
+    strand(i,i<mane,-.62+i*.2,-.02,-.56+i*.2,-.66-sin(t*3+i)*.1,
+      -.62+i*.2,-.4,.12,16);
+  var hp=[[-.86,.16,-1],[-.3,-.1,-1],[.3,-.1,1],[.86,.16,1]];
+  for(var h=0;h<4;h++){ var p=hp[h], dd=mane<=h*1.75, lg=dd?0:abs(sin(t*10+h));
+    V.beginPath(); V.moveTo(p[0]*.6,.22); V.lineTo(p[0],p[1]+.2+(dd?.24:0)); strk(FL2,.2);
+    hd(p[0],p[1]-lg*.04+(dd?.24:0),.44,FLESH,FL3,'#ff3fd0','#8a1f5e',lg,
+       dd?p[2]*.9:p[2]*.25,p[2],dd); }
+ }
+}];
+
+/* =====================================================================
+   Affichage
+   ===================================================================== */
+var cv=document.getElementById('c'), X, W, H, T=0, MANE=7, ANIM=1, SOLO=-1;
+function resize(){ var d=devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=r.width*d; cv.height=r.height*d;
+  X=cv.getContext('2d'); X.setTransform(d,0,0,d,0,0); W=r.width; H=r.height; }
+addEventListener('resize',resize);
+
+document.getElementById('mane').oninput=function(){
+  MANE=+this.value; document.getElementById('manev').textContent=MANE; };
+document.getElementById('anim').onchange=function(){ ANIM=this.checked?1:0; };
+var back=document.getElementById('back');
+back.onclick=function(){ SOLO=-1; back.style.display='none'; note(); };
+
+function cellRect(i){ var cw=W/3, ch=(H)/2;
+  return [ (i%3)*cw, ((i/3)|0)*ch, cw, ch ]; }
+cv.onclick=function(e){
+  if(SOLO>=0) return;
+  var r=cv.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
+  for(var i=0;i<6;i++){ var b=cellRect(i);
+    if(x>b[0]&&x<b[0]+b[2]&&y>b[1]&&y<b[1]+b[3]){
+      SOLO=i; back.style.display=''; note(); return; } }
+};
+function note(){ var n=document.getElementById('note');
+  n.innerHTML = SOLO<0
+    ? 'Les six respectent la regle: <b>7 meches volees = 7 points de vie</b>, une meche arrachee eteint une tete. Bouge le curseur pour voir l agonie.'
+    : '<b>'+BOSS[SOLO].n+'</b> &nbsp; '+BOSS[SOLO].d; }
+
+function bg(){ var g=X.createRadialGradient(W/2,H/2,60,W/2,H/2,Math.max(W,H)*.8);
+  g.addColorStop(0,'#241040'); g.addColorStop(1,'#1b0b2e');
+  X.fillStyle=g; X.fillRect(0,0,W,H);
+  X.strokeStyle='#33195c'; X.lineWidth=1; X.globalAlpha=.4; X.beginPath();
+  for(var x=0;x<W;x+=48){ X.moveTo(x|0,0); X.lineTo(x|0,H); }
+  for(var y=0;y<H;y+=48){ X.moveTo(0,y|0); X.lineTo(W,y|0); }
+  X.stroke(); X.globalAlpha=1; }
+
+function draw(i,cx,cy,s){
+  V=X; X.save(); X.translate(cx,cy); X.scale(s,s);
+  BOSS[i].f(T,MANE); X.restore(); }
+
+var last=0;
+function frame(ts){ var dt=Math.min(.05,(ts-last)/1000||0); last=ts;
+  if(ANIM) T+=dt;
+  bg();
+  if(SOLO>=0){ draw(SOLO,W/2,H*.5,Math.min(W,H)*.34);
+  } else {
+    for(var i=0;i<6;i++){ var b=cellRect(i);
+      draw(i,b[0]+b[2]/2,b[1]+b[3]*.52,Math.min(b[2],b[3])*.31);
+      X.fillStyle='#ffc61e'; X.font='bold 13px ui-monospace,monospace';
+      X.textAlign='center'; X.fillText(BOSS[i].n,b[0]+b[2]/2,b[1]+22);
+      X.strokeStyle='#3a1c5c'; X.strokeRect(b[0]+.5,b[1]+.5,b[2],b[3]); }
+    X.textAlign='left';
+  }
+  requestAnimationFrame(frame);
+}
+resize(); note(); requestAnimationFrame(frame);
+</script>
+</html>

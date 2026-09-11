@@ -1,0 +1,65 @@
+{
+  "achievements": [
+    {
+      "identifier": "FIRST_BLOOD",
+      "display_name": "First Blood",
+      "description": "Fell your first unicorn. They had it coming.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "HUNDRED_HORNS",
+      "display_name": "Hundred Horns",
+      "description": "Fell 100 unicorns in a single run.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "MOTHER_LODE",
+      "display_name": "Mother Lode",
+      "description": "Fell a Mother. She splits in two on the way out.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "PAINT_IT_BACK",
+      "display_name": "Paint It Back",
+      "description": "Stay unhurt long enough for a burnt-out band to repaint itself, power and all.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "THIN_RED_LINE",
+      "display_name": "Thin Red Line",
+      "description": "Survive down to a single lit band.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "FULL_SPECTRUM",
+      "display_name": "Full Spectrum",
+      "description": "Paint all seven bands in one run.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "UNTOUCHED_ARCH",
+      "display_name": "Untouched Arch",
+      "description": "Paint all seven bands without taking a single hit.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "ROYGBIV",
+      "display_name": "ROYGBIV",
+      "description": "Tear the last rainbow strand from the hydra's mane.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "PERFECT_PRISM",
+      "display_name": "Perfect Prism",
+      "description": "Win with all seven bands still lit.",
+      "stat_requirement": null
+    },
+    {
+      "identifier": "SPEED_OF_LIGHT",
+      "display_name": "Speed of Light",
+      "description": "Win in under 150 seconds.",
+      "stat_requirement": null
+    }
+  ],
+  "stats": []
+}

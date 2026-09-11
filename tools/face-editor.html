@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROYGBIV / editeur de visage</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#12061f;color:#c8b0e8;
+    font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;overflow:hidden}
+  #app{display:flex;height:100%}
+  #left{flex:1;display:flex;flex-direction:column;min-width:0}
+  #right{width:330px;background:#1a0a2c;border-left:1px solid #3a1c5c;
+    overflow-y:auto;padding:10px 12px 40px}
+  canvas{flex:1;display:block;width:100%;min-height:0}
+  #bar{padding:8px 12px;background:#1c0c2e;border-bottom:1px solid #3a1c5c;
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  #bar b{color:#ffc61e;letter-spacing:2px}
+  h3{margin:14px 0 6px;color:#ffc61e;font-size:11px;letter-spacing:1.5px;
+    border-bottom:1px solid #3a1c5c;padding-bottom:4px}
+  .row{display:flex;align-items:center;gap:6px;margin:2px 0}
+  .row label{width:96px;flex:none;color:#9b83c0}
+  .row input[type=range]{flex:1;min-width:0;accent-color:#c04ff0}
+  .row span{width:46px;text-align:right;color:#e8d8ff}
+  label.chk{display:flex;gap:5px;align-items:center;cursor:pointer;user-select:none}
+  button{background:#3a1c5c;color:#e8d8ff;border:1px solid #6b3fa0;border-radius:4px;
+    padding:5px 10px;cursor:pointer;font:inherit}
+  button:hover{background:#4d2578}
+  textarea{width:100%;height:150px;background:#0d0518;color:#8fe8c8;
+    border:1px solid #3a1c5c;border-radius:4px;font:11px/1.4 ui-monospace,monospace;padding:6px}
+</style>
+<div id="app">
+  <div id="left">
+    <div id="bar">
+      <b>EDITEUR DE VISAGE</b>
+      <label class="chk"><input id="anim" type="checkbox" checked> anim</label>
+      <label class="chk"><input id="laugh" type="checkbox" checked> rire ouvert</label>
+      <label class="chk"><input id="guide" type="checkbox"> reperes</label>
+      <label class="chk"><input id="layout" type="checkbox" checked> vue titre</label>
+      <button id="reset">defaut</button>
+      <span id="fps"></span>
+    </div>
+    <canvas id="c"></canvas>
+  </div>
+  <div id="right">
+    <div id="sliders"></div>
+    <h3>CODE A RECOLLER DANS mkHead</h3>
+    <textarea id="out" readonly></textarea>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <button id="copy">copier</button>
+      <button id="dump">console</button>
+    </div>
+  </div>
+</div>
+<script>
+/* =====================================================================
+   ROYGBIV / editeur de visage
+   Outil de dev. Il ne part pas dans le zip: il sert a regler la geometrie
+   des tetes de licorne, puis a recracher le corps exact de mkHead()
+   qu'on recolle dans index.html.
+   ===================================================================== */
+
+var OUT='#150719', HORN='#ffd257', HORNH='#fff2b8', DK='#1a0b2b';
+
+// les quatre nuanciers de l'ecran titre: [corps, ombre, criniere, criniere 2]
+var COLORWAYS=[
+  ['#a8ecdc','#6fc9b8','#ffb3e0','#c97fb0'],
+  ['#f5c4ff','#c08fd6','#a8e8dc','#6fb8c9'],
+  ['#d9b8ff','#a88fd6','#ffc4a8','#d69f7f'],
+  ['#ffe0b8','#d6b88f','#ffb3d9','#7fd6c9']
+];
+
+/* ---------- parametres reglables ------------------------------------
+   cle, libelle, defaut, min, max, pas. L'ordre definit l'affichage.   */
+var GROUPS=[
+ ['TETE',[
+  ['hRX','largeur',   .585,.30,1.10,.005],
+  ['hRY','hauteur',   .575,.30,1.10,.005],
+  ['out','contour',    .03,   0, .14,.002]]],
+ ['YEUX',[
+  ['eLX','gauche x',  -.18,-.70, .30,.005],
+  ['eLY','gauche y', -.095,-.60, .40,.005],
+  ['eLR','gauche r',   .24, .05, .45,.005],
+  ['eRX','droit x',   .305,-.20, .80,.005],
+  ['eRY','droit y',   -.16,-.60, .40,.005],
+  ['eRR','droit r',    .21, .05, .45,.005],
+  ['pup','pupille',    .52, .20, .95,.01],
+  ['pey','pupille h',  .62, .20,1.00,.01],
+  ['look','regard',   1.00,-1.5, 1.5,.05],
+  ['gl','reflet',      .19, .05, .45,.01]]],
+ ['MUSEAU',[
+  ['mX','x',           .35, .00,1.00,.005],
+  ['mY','y',          .325,-.30, .70,.005],
+  ['mRX','largeur',    .39, .10, .70,.005],
+  ['mRY','hauteur',    .28, .08, .60,.005],
+  ['nX','naseau x',    .60, .10,1.00,.005],
+  ['nY','naseau y',    .18,-.30, .60,.005],
+  ['nR','naseau r',    .05, .01, .16,.002]]],
+ ['BOUCHE (rire)',[
+  ['bX','x',          .365, .00,1.00,.005],
+  ['bY','y',           .34,-.10, .90,.005],
+  ['bRX','largeur',    .29, .05, .55,.005],
+  ['bRY','hauteur',    .19, .04, .50,.005],
+  ['tY','langue y',    .44,-.10,1.00,.005],
+  ['tRX','langue l',   .14, .03, .40,.005],
+  ['tRY','langue h',   .08, .02, .30,.005],
+  ['dX','dents x',    .215,-.20, .70,.005],
+  ['dY','dents y',     .12,-.20, .70,.005],
+  ['dW','dents l',    .275, .05, .80,.005],
+  ['dH','dents h',     .12, .02, .25,.005],
+  ['dRB','dent plate', .55, .05,1.00,.01]]],
+ ['BOUCHE (sourire)',[
+  ['sX','x',          .425, .00,1.00,.005],
+  ['sY','y',           .27,-.20, .80,.005],
+  ['sR','rayon',       .20, .03, .40,.005],
+  ['sW','epaisseur',  .126, .02, .18,.002]]],
+ ['CORNE',[
+  ['kBX','base x',    -.04,-.50, .50,.005],
+  ['kBW','base larg.', .24, .06, .60,.005],
+  ['kTX','pointe x',   .13,-.40, .60,.005],
+  ['kTY','pointe y', -1.12,-2.0,-.60,.01]]],
+ ['CRINIERE',[
+  ['cN','nombre',      5,    1,  10,  1],
+  ['cA0','angle 1',  3.30, 1.5, 5.5,.02],
+  ['cAS','pas',       .34, .05, .90,.01],
+  ['cRX','rayon x',   .62, .20,1.20,.005],
+  ['cRY','rayon y',   .66, .20,1.20,.005],
+  ['cB','taille',     .28, .08, .60,.005],
+  ['cSH','degressif', .02,   0, .10,.002]]],
+ ['BRAS ET SABOT',[
+  ['aOff','depart',    .24, .00, .60,.01],
+  ['aLen','longueur',  .19, .05, .50,.005],
+  ['aTh','epaisseur', .036,.008, .10,.001],
+  ['aAng','angle',     .00,-.70, .70,.01],
+  ['aOut','contour',  1.18,1.00,1.70,.01],
+  ['aShX','reflet x',  .45, .00,1.00,.01],
+  ['aShY','reflet y', -.42,-1.2, .40,.02],
+  ['aShW','reflet l',  .38, .05, .90,.01],
+  ['aShH','reflet h',  .26, .05, .90,.01],
+  ['hBack','sabot bas',.20,-.60,1.60,.02],
+  ['hTip','sabot bout',1.90,.60,3.60,.02],
+  ['hSpr','sabot larg',.92, .20,2.20,.02]]],
+ ['JOUES',[
+  ['jX','x',         -.09,-.80, .40,.005],
+  ['jY','y',          .30,-.20, .70,.005],
+  ['jRX','largeur',   .13, .03, .35,.005],
+  ['jRY','hauteur',   .09, .02, .30,.005]]]
+];
+
+var DEF={}, CFG={};
+GROUPS.forEach(function(g){ g[1].forEach(function(p){ DEF[p[0]]=p[2]; }); });
+function resetCfg(){ for(var k in DEF) CFG[k]=DEF[k]; }
+resetCfg();
+
+/* ---------- primitives (identiques a celles du jeu) ----------------- */
+var V;
+function el(x,y,rx,ry,c,rot){ V.save(); V.translate(x,y); if(rot) V.rotate(rot);
+  V.scale(rx,ry); V.beginPath(); V.arc(0,0,1,0,6.2832); V.restore();
+  V.fillStyle=c; V.fill(); }
+function elo(x,y,rx,ry,c,o){ el(x,y,rx+(o===undefined?CFG.out:o),ry+(o===undefined?CFG.out:o),OUT);
+  el(x,y,rx,ry,c); }
+function tri(ax,ay,bx,by,cx,cy,c){ V.beginPath(); V.moveTo(ax,ay);
+  V.lineTo(bx,by); V.lineTo(cx,cy); V.closePath(); V.fillStyle=c; V.fill(); }
+function strk(c,w){ V.strokeStyle=c; V.lineWidth=w; V.lineCap='round'; V.stroke(); }
+function eyeq(x,y,r,lk){ elo(x,y,r,r*1.05,'#fff',.03);
+  el(x+lk*r*.3,y+r*.12,r*CFG.pup,r*CFG.pey,DK);
+  el(x+lk*r*.3-r*.16,y-r*.18,r*CFG.gl,r*CFG.gl,'#fff'); }
+
+/* ---------- la tete, pilotee par CFG -------------------------------- */
+function head(g,col,laugh,sc){
+  var b=col[0], sh=col[1], m=col[2], md=col[3], i, a;
+  V=g; g.save(); g.scale(sc,sc);
+  for(i=0;i<CFG.cN;i++){ a=CFG.cA0+i*CFG.cAS;
+    el(Math.cos(a)*CFG.cRX, Math.sin(a)*CFG.cRY,
+       CFG.cB-i*CFG.cSH, CFG.cB+.02-i*CFG.cSH, i%2?m:md); }
+  elo(0,0,CFG.hRX,CFG.hRY,b);
+  el(CFG.mX,CFG.mY,CFG.mRX,CFG.mRY,b);
+  el(CFG.mX+.08,CFG.mY+.02,CFG.mRX*.82,CFG.mRY*.79,'rgba(255,255,255,.3)');
+  el(CFG.nX,CFG.nY,CFG.nR,CFG.nR*1.2,sh);
+  tri(CFG.kBX-.04,-CFG.hRY*.83, CFG.kBX+CFG.kBW+.04,-CFG.hRY*.77, CFG.kTX+.01,CFG.kTY-.08,OUT);
+  tri(CFG.kBX,-CFG.hRY*.86, CFG.kBX+CFG.kBW,-CFG.hRY*.80, CFG.kTX,CFG.kTY,HORN);
+  tri(CFG.kBX+.06,-CFG.hRY*.86, CFG.kBX+CFG.kBW*.5,-CFG.hRY*.83, CFG.kTX-.02,CFG.kTY*.84,HORNH);
+  eyeq(CFG.eLX,CFG.eLY,CFG.eLR,CFG.look);
+  eyeq(CFG.eRX,CFG.eRY,CFG.eRR,CFG.look);
+  el(CFG.jX,CFG.jY,CFG.jRX,CFG.jRY,'#ff6fa8');
+  if(laugh){ elo(CFG.bX,CFG.bY,CFG.bRX,CFG.bRY,'#3a1030',.03);
+    el(CFG.bX,CFG.tY,CFG.tRX,CFG.tRY,'#ff5f8f');
+    g.fillStyle='#fff'; g.fillRect(CFG.dX,CFG.dY,CFG.dW,CFG.dH*CFG.dRB);
+    el(CFG.dX+CFG.dW/2,CFG.dY+CFG.dH*CFG.dRB,CFG.dW/2,CFG.dH*(1-CFG.dRB),'#fff'); }
+  else { g.beginPath(); g.arc(CFG.sX,CFG.sY,CFG.sR,.2,2.6); strk(DK,CFG.sW); }
+  if(UI.guide){                                   // reperes de reglage
+    g.globalAlpha=.5; g.strokeStyle='#00e5ff'; g.lineWidth=.012;
+    g.beginPath(); g.moveTo(-1.4,0); g.lineTo(1.4,0);
+    g.moveTo(0,-1.6); g.lineTo(0,1.4); g.stroke();
+    g.strokeStyle='#ffc61e';
+    g.beginPath(); g.ellipse(0,0,CFG.hRX,CFG.hRY,0,0,6.2832); g.stroke();
+    g.globalAlpha=1; }
+  g.restore();
+}
+
+/* ---------- interface ------------------------------------------------ */
+var UI={anim:1,laugh:1,guide:0,layout:1};
+['anim','laugh','guide','layout'].forEach(function(id){
+  document.getElementById(id).onchange=function(){ UI[id]=this.checked?1:0; };
+});
+
+var box=document.getElementById('sliders'), out=document.getElementById('out'), html='';
+GROUPS.forEach(function(g,gi){
+  html+='<h3>'+g[0]+'</h3>';
+  g[1].forEach(function(p){
+    html+='<div class="row"><label>'+p[1]+'</label>'+
+      '<input type="range" data-k="'+p[0]+'" min="'+p[3]+'" max="'+p[4]+'" step="'+p[5]+'" value="'+p[2]+'">'+
+      '<span id="v_'+p[0]+'">'+p[2]+'</span></div>';
+  });
+});
+box.innerHTML=html;
+function syncOne(k){ var e=document.getElementById('v_'+k);
+  if(e) e.textContent=(+CFG[k]).toFixed(3).replace(/0+$/,'').replace(/\.$/,''); }
+box.addEventListener('input',function(e){
+  var k=e.target.getAttribute('data-k'); if(!k) return;
+  CFG[k]=+e.target.value; syncOne(k); genCode();
+});
+function syncAll(){ [].forEach.call(box.querySelectorAll('input'),function(inp){
+    inp.value=CFG[inp.getAttribute('data-k')]; });
+  for(var k in CFG) syncOne(k); genCode(); }
+document.getElementById('reset').onclick=function(){ resetCfg(); syncAll(); };
+
+/* ---------- generation du code a recoller ---------------------------- */
+function n(v){ var s=(+v).toFixed(3);
+  s=s.replace(/0+$/,'').replace(/\.$/,''); 
+  return s.replace(/^0\./,'.').replace(/^-0\./,'-.'); }
+function genCode(){
+  out.value =
+"function mkHead(b,sh,m,md,lg,S){\n"+
+"  S=S||24;\n"+
+"  var c=offc(S*2.34,S*2.34,S*1.084,S*1.334,S), i, a;\n"+
+"  c.ox=S*1.084; c.oy=S*1.334;\n"+
+"  for(i=0;i<"+CFG.cN+";i++){ a="+n(CFG.cA0)+"+i*"+n(CFG.cAS)+";\n"+
+"    el(cos(a)*"+n(CFG.cRX)+",sin(a)*"+n(CFG.cRY)+","+n(CFG.cB)+"-i*"+n(CFG.cSH)+","+n(CFG.cB+.02)+"-i*"+n(CFG.cSH)+",i%2?m:md); }\n"+
+"  elo(0,0,"+n(CFG.hRX)+","+n(CFG.hRY)+",b,"+n(CFG.out)+");\n"+
+"  el("+n(CFG.mX)+","+n(CFG.mY)+","+n(CFG.mRX)+","+n(CFG.mRY)+",b);\n"+
+"  el("+n(CFG.mX+.08)+","+n(CFG.mY+.02)+","+n(CFG.mRX*.82)+","+n(CFG.mRY*.79)+",'rgba(255,255,255,.3)');\n"+
+"  el("+n(CFG.nX)+","+n(CFG.nY)+","+n(CFG.nR)+","+n(CFG.nR*1.2)+",sh);\n"+
+"  tri("+n(CFG.kBX-.04)+","+n(-CFG.hRY*.83)+","+n(CFG.kBX+CFG.kBW+.04)+","+n(-CFG.hRY*.77)+","+n(CFG.kTX+.01)+","+n(CFG.kTY-.08)+",OUT);\n"+
+"  tri("+n(CFG.kBX)+","+n(-CFG.hRY*.86)+","+n(CFG.kBX+CFG.kBW)+","+n(-CFG.hRY*.8)+","+n(CFG.kTX)+","+n(CFG.kTY)+",HORN);\n"+
+"  tri("+n(CFG.kBX+.06)+","+n(-CFG.hRY*.86)+","+n(CFG.kBX+CFG.kBW*.5)+","+n(-CFG.hRY*.83)+","+n(CFG.kTX-.02)+","+n(CFG.kTY*.84)+",HORNH);\n"+
+"  eyeq("+n(CFG.eLX)+","+n(CFG.eLY)+","+n(CFG.eLR)+","+n(CFG.look)+");\n"+
+"  eyeq("+n(CFG.eRX)+","+n(CFG.eRY)+","+n(CFG.eRR)+","+n(CFG.look)+");\n"+
+"  el("+n(CFG.jX)+","+n(CFG.jY)+","+n(CFG.jRX)+","+n(CFG.jRY)+",'#ff6fa8');\n"+
+"  if(lg){ elo("+n(CFG.bX)+","+n(CFG.bY)+","+n(CFG.bRX)+","+n(CFG.bRY)+",'#3a1030',.03);\n"+
+"    el("+n(CFG.bX)+","+n(CFG.tY)+","+n(CFG.tRX)+","+n(CFG.tRY)+",'#ff5f8f');\n"+
+"    V.fillStyle='#fff'; V.fillRect("+n(CFG.dX)+","+n(CFG.dY)+","+n(CFG.dW)+","+n(CFG.dH*CFG.dRB)+");\n"+
+"    el("+n(CFG.dX+CFG.dW/2)+","+n(CFG.dY+CFG.dH*CFG.dRB)+","+n(CFG.dW/2)+","+n(CFG.dH*(1-CFG.dRB))+",'#fff'); }\n"+
+"  else { V.beginPath(); V.arc("+n(CFG.sX)+","+n(CFG.sY)+","+n(CFG.sR)+",.2,2.6); strk(DK,"+n(CFG.sW)+"); }\n"+
+"  return c;\n}\n\n"+
+"// ---- BRAS ET SABOT: a recoller dans drawTitle ----\n"+
+"    var bx=px+(cx-px)*"+n(CFG.aOff)+", by=py+(cy-py)*"+n(CFG.aOff)+",\n"+
+"        ba=atan(cy-by,cx-bx)+"+n(CFG.aAng)+"*fx, bl=m*("+n(CFG.aLen)+"+lg*0.006), th=m*"+n(CFG.aTh)+";\n"+
+"    X.save(); X.translate(bx,by); X.rotate(ba);\n"+
+"    X.fillStyle=OUT;\n"+
+"    X.beginPath(); X.ellipse(bl*0.5,0,bl*0.52,th*"+n(CFG.aOut)+",0,0,TAU); X.fill();\n"+
+"    X.fillStyle=TA[i][0];\n"+
+"    X.beginPath(); X.ellipse(bl*0.5,0,bl*0.5,th,0,0,TAU); X.fill();\n"+
+"    X.fillStyle='rgba(255,255,255,0.22)';\n"+
+"    X.beginPath(); X.ellipse(bl*"+n(CFG.aShX)+",th*"+n(CFG.aShY)+",bl*"+n(CFG.aShW)+",th*"+n(CFG.aShH)+",0,0,TAU); X.fill();\n"+
+"    X.fillStyle=TA[i][1];\n"+
+"    X.beginPath(); X.moveTo(bl+th*"+n(CFG.hBack)+",-th*"+n(CFG.hSpr)+");\n"+
+"    X.lineTo(bl+th*"+n(CFG.hTip)+",0); X.lineTo(bl+th*"+n(CFG.hBack)+",th*"+n(CFG.hSpr)+");\n"+
+"    X.closePath(); X.fill(); X.restore();\n\n"+
+"// eyeq doit utiliser ces ratios de pupille:\n"+
+"//   el(x+lk*r*.3, y+r*.12, r*"+n(CFG.pup)+", r*"+n(CFG.pey)+", DK);\n"+
+"//   el(x+lk*r*.3-r*.16, y-r*.18, r*"+n(CFG.gl)+", r*"+n(CFG.gl)+", '#fff');";
+}
+document.getElementById('copy').onclick=function(){
+  out.select(); document.execCommand('copy'); this.textContent='copie'; 
+  var b=this; setTimeout(function(){ b.textContent='copier'; },900); };
+document.getElementById('dump').onclick=function(){ console.log(JSON.stringify(CFG,null,1)); };
+
+/* ---------- rendu ----------------------------------------------------- */
+var cv=document.getElementById('c'), X, W, H, T=0;
+function resize(){ var d=devicePixelRatio||1, r=cv.getBoundingClientRect();
+  cv.width=r.width*d; cv.height=r.height*d;
+  X=cv.getContext('2d'); X.setTransform(d,0,0,d,0,0); W=r.width; H=r.height; }
+addEventListener('resize',resize);
+
+// le membre tendu et le sabot qui pointe, entierement reglables
+function arm(px,py,cx,cy,m,lg,col,fx){
+  var bx=px+(cx-px)*CFG.aOff, by=py+(cy-py)*CFG.aOff,
+      ba=Math.atan2(cy-by,cx-bx)+CFG.aAng*(fx||1),
+      bl=m*(CFG.aLen+lg*.006), th=m*CFG.aTh;
+  X.save(); X.translate(bx,by); X.rotate(ba);
+  X.fillStyle=OUT;
+  X.beginPath(); X.ellipse(bl*.5,0,bl*.52,th*CFG.aOut,0,0,6.2832); X.fill();
+  X.fillStyle=col[0];
+  X.beginPath(); X.ellipse(bl*.5,0,bl*.5,th,0,0,6.2832); X.fill();
+  X.fillStyle='rgba(255,255,255,.22)';
+  X.beginPath(); X.ellipse(bl*CFG.aShX,th*CFG.aShY,bl*CFG.aShW,th*CFG.aShH,0,0,6.2832); X.fill();
+  X.fillStyle=col[1];
+  X.beginPath(); X.moveTo(bl+th*CFG.hBack,-th*CFG.hSpr);
+  X.lineTo(bl+th*CFG.hTip,0); X.lineTo(bl+th*CFG.hBack,th*CFG.hSpr);
+  X.closePath(); X.fill(); X.restore();
+}
+function bg(){
+  var g=X.createRadialGradient(W/2,H/2,60,W/2,H/2,Math.max(W,H)*.8);
+  g.addColorStop(0,'#241040'); g.addColorStop(1,'#1b0b2e');
+  X.fillStyle=g; X.fillRect(0,0,W,H);
+}
+
+var last=0, fr=0, ft=0;
+function frame(ts){
+  var dt=Math.min(.05,(ts-last)/1000||0); last=ts;
+  if(UI.anim) T+=dt;
+  fr++; ft+=dt; if(ft>.5){ document.getElementById('fps').textContent=(fr/ft|0)+' fps'; fr=0; ft=0; }
+  bg();
+
+  var m=Math.min(W,H);
+  if(UI.layout){
+    // apercu de l'ecran titre: les quatre coins qui pointent vers le centre
+    var C4=[[.13,.12,1],[.87,.12,-1],[.13,.88,1],[.87,.88,-1]], cx=W/2, cy=H*.54;
+    for(var i=0;i<4;i++){
+      var p=C4[i], px=p[0]*W, py=p[1]*H, fx=p[2],
+          lg=Math.sin(T*7+i*1.7), sc=m*.44/1.32/2;
+      arm(px,py,cx,cy,m,lg,COLORWAYS[i],fx);
+      X.save(); X.translate(px,py+lg*3); X.scale(fx,1);
+      X.rotate((p[1]<.5?.42:-.42)+lg*.05);
+      head(X,COLORWAYS[i],UI.laugh,sc); X.restore();
+    }
+    X.fillStyle='#8f7ab8'; X.font='11px ui-monospace,monospace'; X.textAlign='center';
+    X.fillText('vue titre',W/2,H-12); X.textAlign='left';
+  } else {
+    // grande tete isolee, plus les quatre nuanciers en bas
+    var bigLg=UI.laugh;
+    arm(W*.5,H*.42,W*.95,H*.42,m,Math.sin(T*7),COLORWAYS[0],1);
+    X.save(); X.translate(W/2,H*.42); head(X,COLORWAYS[0],bigLg,m*.26); X.restore();
+    for(var j=0;j<4;j++){
+      X.save(); X.translate(W*(.2+j*.2),H*.84);
+      head(X,COLORWAYS[j],bigLg,m*.075); X.restore(); }
+    X.fillStyle='#8f7ab8'; X.font='11px ui-monospace,monospace'; X.textAlign='center';
+    X.fillText('les quatre nuanciers du titre',W/2,H-12); X.textAlign='left';
+  }
+  requestAnimationFrame(frame);
+}
+resize(); syncAll(); requestAnimationFrame(frame);
+</script>
+</html>

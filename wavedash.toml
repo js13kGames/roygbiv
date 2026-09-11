@@ -1,0 +1,7 @@
+# Le game_id vient du Developer Portal ; `wavedash init` le renseigne.
+game_id = ""
+# La cible Wavedash est la page NON compressee : la plateforme n'a pas de limite
+# de taille, et une page lisible rend un bug de la-bas diagnosticable.
+# Ne jamais pointer sur dist/ tout entier : cela enverrait aussi l'archive du concours.
+upload_dir = "dist/wavedash"
+entrypoint = "index.html"
