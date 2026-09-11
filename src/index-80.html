@@ -15,10 +15,10 @@ canvas{display:block;width:100%;height:100%;image-rendering:pixelated;image-rend
 // ---------- canvas ----------
 var C=document.getElementById('c'), X=C.getContext('2d'), W, H, Z=0.74, SC=1;
 var AW=3000, AH=3000, camX=0, camY=0;
-// police 3x5: 59 glyphes de l'espace a Z, 15 bits chacun, en base 32
+// 3x5 font: 59 glyphs from space to Z, 15 bits each, in base 32
 var FONT='000942000000000kl50009000000000001eg00k0e00024l4urfb4nol7smfmu9uceeffskiuvfuue10g000000000000ok2000avdqtee93qreud7ud4ebbmvdt4n4jamtdi97nvdqrdaraqt4aqhqtde4et4imrfmramvtmldmkisl7';
-// taille d'un point en pixels internes, pour une police fs et n caracteres
-var TXW=0;   // largeur maximale locale pour le texte, 0 = tout l'ecran
+// dot size in internal pixels, for a font size fs and n characters
+var TXW=0;   // local max width for text, 0 = the whole screen
 function ppx(fs,n){ return mx(1,mn(Math.round(fs*K*0.32),((TXW||W*0.98)*K/(n*4))|0)); }
 function ptext(t,x,y,fs,c,al,fp){
   t=(''+t).toUpperCase(); var n=t.length, i, b, g, px=fp||ppx(fs,n), s=px/K, w=(n*4-1)*s;
@@ -28,14 +28,14 @@ function ptext(t,x,y,fs,c,al,fp){
     for(b=0;b<15;b++) if(g>>(14-b)&1) X.fillRect(x+i*4*s+(b%3)*s,y+((b/3)|0)*s,s,s); }
   return w;
 }
-// le nombre colle a 'px', pas le premier venu: Safari ecrit '700 30px'
+// the number glued to 'px', not the first one: Safari writes '700 30px'
 function fsz(){ return parseFloat((X.font.match(/([\d.]+)px/)||[0,12])[1]); }
 X.fillText=function(t,x,y){ ptext(t,x,y,fsz(),X.fillStyle,X.textAlign); };
 X.strokeText=function(t,x,y){ var f=X.fillStyle; ptext(t,x+1/K,y+1/K,fsz(),OUT,X.textAlign); X.fillStyle=f; };
 X.measureText=function(t){ var n=(''+t).length; return {width:(n*4-1)*ppx(fsz(),n)/K}; };
 var K=0.4;                                  // 1 unite logique = 0.4 pixel interne
 function resize(){
-  Z=Math.min(2.2,Math.max(0.7,innerHeight/800));    // vue plus serree: on voit mieux le heros
+  Z=Math.min(2.2,Math.max(0.7,innerHeight/800));    // tighter view: the hero is easier to see
   W=innerWidth/Z; H=innerHeight/Z; SC=K;
   C.width=W*K|0; C.height=H*K|0; X.imageSmoothingEnabled=false;
   AW=AH=Math.max(3000,Math.max(W,H)*1.35); }
@@ -90,16 +90,16 @@ function mTone(f,t,d,type,v,det){ var o=AC.createOscillator(), g=AC.createGain()
   o.connect(g); g.connect(musGain);
   g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(v,t+0.02);
   g.gain.exponentialRampToValueAtTime(0.0001,t+d); o.start(t); o.stop(t+d+0.04); }
-// percussion: du bruit blanc court, l'enveloppe est cuite dans le tampon
+// percussion: short white noise, the envelope is baked into the buffer
 function mNoise(t,d,v){ var n=AC.sampleRate*d|0,
   bf=AC.createBuffer(1,n,AC.sampleRate), c=bf.getChannelData(0), i;
   for(i=0;i<n;i++) c[i]=(rnd()*2-1)*(1-i/n)*v;
   var s=AC.createBufferSource(); s.buffer=bf; s.connect(musGain); s.start(t); }
-// ITALO ARC-EN-CIEL: quatre temps, arpege ascendant, clap sur les pairs
+// RAINBOW ITALO: four beats, rising arpeggio, clap on the even beats
 function musFn(i,t){ var bar=(i/16|0), r=PROG[bar%4], b=i%16;
-  if(b%4===0) mTone(hz(r-24),t,0.16,'sine',0.16);            // le pied
-  if(b===4||b===12) mNoise(t,0.13,0.5);                      // le clap
-  if(b%4===2) mNoise(t,0.035,0.22);                          // la charleston
+  if(b%4===0) mTone(hz(r-24),t,0.16,'sine',0.16);            // the kick
+  if(b===4||b===12) mNoise(t,0.13,0.5);                      // the clap
+  if(b%4===2) mNoise(t,0.035,0.22);                          // the hi-hat
   mTone(hz(r+SCALE[b%7]+(b>7?12:0)),t,0.11,'sawtooth',0.038,6);
   if(b%8===0) mTone(hz(r-12),t,STEP16*4,'triangle',0.05,-4); }
 function musTick(){ if(!AC||!musOn) return; var a=AC.currentTime+0.25;
@@ -110,14 +110,14 @@ function startMusic(){ if(musOn||!ensureAudio()) return; musOn=true;
   musGain.gain.linearRampToValueAtTime(0.45,AC.currentTime+2);
   tempo(); musNext=AC.currentTime+0.1; musStep=0; setInterval(musTick,60); }
 
-// ---------- couleurs communes a tous les sprites ----------
+// ---------- colours shared by all the sprites ----------
 var OUT='#150719', HORN='#ffd257', HORNH='#fff2b8', DK='#1a0b2b', HOOF='#5b3f7a';
 
-// ---------- vector sprite kit (DA validee au labo) ----------
-// Tout est dessine en primitives molles: ellipses, rects arrondis,
-// triangles. Style peluche facon Happy Tree Villains. Chaque sprite est
-// cuit une fois dans un canvas offscreen puis blitte.
-var V;                                    // contexte de dessin courant
+// ---------- vector sprite kit (art direction approved in the lab) ----------
+// Everything is drawn with soft primitives: ellipses, rounded rects,
+// triangles. Plush-toy style, Happy Tree Villains vein. Each sprite is
+// baked once into an offscreen canvas, then blitted.
+var V;                                    // the current drawing context
 function offc(w,h,cx,cy,sc){
   var c=document.createElement('canvas'); c.width=w; c.height=h;
   V=c.getContext('2d'); V.translate(cx,cy); if(sc) V.scale(sc,sc);
@@ -134,12 +134,12 @@ function rct(x,y,w,h,r,c){ V.beginPath(); V.moveTo(x+r,y);
 function tri(ax,ay,bx,by,cx,cy,c){ V.beginPath(); V.moveTo(ax,ay);
   V.lineTo(bx,by); V.lineTo(cx,cy); V.closePath(); V.fillStyle=c; V.fill(); }
 function strk(c,w){ V.strokeStyle=c; V.lineWidth=w; V.lineCap='round'; V.stroke(); }
-// l'oeil vitreux, enorme, la signature du style
+// the glassy eye, huge, the signature of the style
 function eyeq(x,y,r,lk){ elo(x,y,r,r*1.05,'#fff',.03);
   el(x+lk*r*.3,y+r*.12,r*.52,r*.62,DK);
   el(x+lk*r*.3-r*.16,y-r*.18,r*.19,r*.19,'#fff'); }
 
-// une licorne, de profil trois quarts, tournee vers la droite.
+// a unicorn, three-quarter profile, facing right.
 function mkUni(b,sh,m,md){
   var c=offc(92,100,46,50,42), i, a;
   el(-.72,-.05,.2,.3,m,.2); el(-.8,.18,.15,.22,md,.2);      // queue
@@ -161,7 +161,7 @@ function mkUni(b,sh,m,md){
   return c;
 }
 
-// une tete de licorne seule: sert au boss et aux tetes qui volent.
+// a lone unicorn head: used for the boss and the flying heads.
 function xe(x,y,r){ V.beginPath(); V.moveTo(x-r,y-r); V.lineTo(x+r,y+r);
   V.moveTo(x+r,y-r); V.lineTo(x-r,y+r); strk(DK,r*.42); }
 function mkHead(b,sh,m,md,lg,S){
@@ -177,10 +177,10 @@ function mkHead(b,sh,m,md,lg,S){
   tri(-.08,-.477,.24,-.443,.14,-1.2,OUT);
   tri(-.04,-.494,.2,-.46,.13,-1.12,HORN);
   tri(.02,-.494,.08,-.477,.11,-.941,HORNH);
-  // lg vaut 0 (sourire ferme), 1 (elle se marre) ou 2 (elle est morte)
+  // lg is 0 (closed smile), 1 (she is laughing) or 2 (she is dead)
   if(lg>1){ xe(-.18,-.095,.2); xe(.305,-.16,.175);
     V.beginPath(); V.arc(.4,.5,.19,3.5,5.9); strk(DK,.1);   // bouche tombante
-    el(.62,.42,.09,.14,'#ff5f8f',.4); }                     // langue qui pend
+    el(.62,.42,.09,.14,'#ff5f8f',.4); }                     // lolling tongue
   else {
     eyeq(-.18,-.095,.24,1); eyeq(.305,-.16,.21,1);
     el(-.09,.3,.13,.09,'#ff6fa8');
@@ -192,8 +192,8 @@ function mkHead(b,sh,m,md,lg,S){
   return c;
 }
 
-// le heros: une arche de 7 bandes, violet en haut, tete de furieux.
-// li = bandes encore peintes, lv = bandes debloquees.
+// the hero: an arch of 7 bands, violet on top, furious face.
+// li = bands still painted, lv = bands unlocked.
 var heroCache={};
 function heroSpr(li,lv,S){
   S=S||32;
@@ -202,23 +202,23 @@ function heroSpr(li,lv,S){
   c.ox=S*1.1; c.oy=S*0.46;
   var R=.98, r0=.44, e=(R-r0)/7, fx=(R+r0)/2, fw=.44,
       lc=li>0?BAND[0]:GRAY[0];
-  rct(-fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                   // un pied sous
-  rct(fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                    // chaque jambe
+  rct(-fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                   // a foot under
+  rct(fx-fw/2-.04,.5,fw+.08,.44,.15,OUT);                    // each leg
   rct(-fx-fw/2,.54,fw,.36,.13,lc);
   rct(fx-fw/2,.54,fw,.36,.13,lc);
   V.beginPath(); V.arc(0,.62,R+.05,PI,0); V.arc(0,.62,r0-.05,0,PI,1);
-  V.closePath(); V.fillStyle=OUT; V.fill();                  // le contour de l'anneau
+  V.closePath(); V.fillStyle=OUT; V.fill();                  // the outline of the ring
   for(i=0;i<7;i++){                                          // rouge dehors, violet dedans
     V.beginPath(); V.arc(0,.62,R-i*e,PI,0); V.arc(0,.62,R-(i+1)*e,0,PI,1);
     V.closePath(); V.fillStyle = i<li?BAND[i] : (i<lv?GRAY[i]:'#2a2140'); V.fill(); }
-  eyeq(-.164,-.2,.131,0); eyeq(.164,-.2,.131,0);             // le visage, sur la couronne
+  eyeq(-.164,-.2,.131,0); eyeq(.164,-.2,.131,0);             // the face, on the crown
   V.beginPath(); V.moveTo(-.312,-.415); V.lineTo(-.041,-.276); strk(DK,.074);
   V.beginPath(); V.moveTo(.312,-.415); V.lineTo(.041,-.276); strk(DK,.074);
   V.beginPath(); V.arc(0,.161,.139,3.5,6); strk(DK,.062);
   return heroCache[k]=c;
 }
 
-// le fusil a pompe, canon vers la droite, pivot sur la crosse.
+// the pump shotgun, barrel to the right, pivot at the stock.
 function mkGun(){
   var c=offc(54,28,2,14,1);
   rct(0,-6,44,11,4,OUT);
@@ -254,8 +254,8 @@ var puds=[];
 
 // ---------- upgrades: 7 families x 3 ----------
 // id = family*3 + choice
-// 4 pouvoirs par bande, on en tire 3 au hasard a chaque montee.
-// Le 3e champ est la forme de la pastille dessinee sur la carte.
+// 4 powers per band, 3 drawn at random on each level up.
+// The 3rd field is the shape of the icon drawn on the card.
 var UP=[
  ['EMBER','shots set unicorns on fire',5],
  ['SPITE','+14% damage for every gray band',6],
@@ -295,7 +295,7 @@ var boss=null, bossWarn=0, spawnT=0, cards=[], mirage=null, storm=null;
 var orbA=0, rainT=0, stormT=0, bossSpawnT=0, xpFl=0;
 var rings=[], gibs=[], texts=[], freeze=0, dim=0;
 function say(x,y,t,c,z){ texts.push({x:x,y:y,t:t,c:c,z:z||1,l:1,dx:rr(-8,8),r:rr(-0.45,0.45)}); }
-// une onde de choc: cercle qui s'ouvre et s'efface
+// a shockwave: a circle that opens out and fades
 function ring(x,y,r0,r1,c,l){ rings.push({x:x,y:y,r:r0,R:r1,c:c,l:l,L:l}); }
 function needFor(l){ return 15+l*25; }
 
@@ -306,7 +306,7 @@ function reset(){
   boss=null; bossWarn=0; spawnT=1.2; mirage=null; storm=null; bossSpawnT=0;
   rings=[]; gibs=[]; texts=[]; freeze=0;
   P.x=AW/2; P.y=AH/2; P.vx=0; P.vy=0; P.ifr=0; P.fireCd=0;
-  // la bande rouge est offerte, sans choix: on entre directement en jeu
+  // the red band comes free, with no choice: you go straight into play
   slot[0]=ri(4); lvl=1; lit=1; xp=0; need=needFor(1);
   tempo();
   recalc(); mode='play';
@@ -345,7 +345,7 @@ function recalc(){
 function levelUp(){
   if(lvl>=7) return;
   var f=lvl*4, a=[f,f+1,f+2,f+3], i, j, t;
-  for(i=3;i>0;i--){ j=ri(i+1); t=a[i]; a[i]=a[j]; a[j]=t; }   // on melange les 4
+  for(i=3;i>0;i--){ j=ri(i+1); t=a[i]; a[i]=a[j]; a[j]=t; }   // shuffle the 4
   cards=[a[0],a[1],a[2]]; mode='up'; sLevel();
 }
 function pick(i){
@@ -365,13 +365,13 @@ function rainbowBurst(x,y,n){ for(var i=0;i<n;i++){ var a=rnd()*TAU, s=70+rnd()*
   parts.push({x:x,y:y,vx:cos(a)*s,vy:sin(a)*s,l:0.35+rnd()*0.6,c:BAND[ri(7)],s:3+ri(3)}); } }
 
 // ---------- input ----------
-// Une seule voie pour la souris, le doigt et le stylet: les Pointer Events.
-// Les touchstart bruts se font avaler par certaines webviews et iframes,
-// alors que le pointeur passe. Repli sur touch/mouse si le navigateur est vieux.
+// One path for mouse, finger and stylus: Pointer Events.
+// Raw touchstart events get swallowed by some webviews and iframes,
+// while the pointer gets through. Falls back to touch/mouse on old browsers.
 var keys={}, isTouch=false;
-// Joystick repris du projet annexe: aucun identifiant de doigt n'est
-// memorise. A chaque evenement on relit e.touches et on recalcule tout.
-// Plus de doigt, le stick s'eteint. Il ne peut donc pas rester coince.
+// Joystick reused from the side project: no finger id is
+// stored. Every event re-reads e.touches and recomputes everything.
+// No finger left, the stick goes out. So it cannot stay stuck.
 var stick={on:0,ox:0,oy:0,dx:0,dy:0,mag:0}, SMAX=76;
 
 addEventListener('keydown',function(e){ var k=e.key.length===1?e.key.toLowerCase():e.key.toLowerCase(); keys[k]=1;
@@ -408,9 +408,9 @@ function click(x,y){
 function start(){ ensureAudio(); startMusic(); reset(); }
 
 // ---------- spawning ----------
-// Distance exacte a parcourir depuis le heros pour sortir du cadre visible,
-// puis une marge. Le heros n'est pas toujours au centre: quand la camera
-// bute sur un bord du monde, il derive vers le bord de l'ecran.
+// Exact distance to travel from the hero to leave the visible frame,
+// then a margin. The hero is not always in the middle: when the camera
+// hits an edge of the world, he drifts toward the edge of the screen.
 function outOfView(a){
   var ca=cos(a), sa=sin(a),
       tx=ca>0?(camX+W-P.x)/ca:ca<0?(camX-P.x)/ca:1e9,
@@ -422,21 +422,21 @@ function spawnEnemy(type,x,y){
   var t=ET[type];
   if(x===undefined){ var e=ri(4), m=70;
     var ang, q, k;
-    // Un demi-tour ne suffit pas: dans un coin du monde, les deux directions
-    // opposees sortent de la carte. On tente plusieurs caps jusqu'a en
-    // trouver un qui tombe a la fois hors du cadre et dans le monde.
+    // A U-turn is not enough: in a corner of the world, both opposite
+    // directions leave the map. We try several headings until we find
+    // one that falls both outside the frame and inside the world.
     for(k=0;k<24;k++){
       ang=(!k&&(P.vx||P.vy)&&rnd()<0.55)?atan(P.vy,P.vx)+rr(-1.05,1.05):rnd()*TAU;
       q=outOfView(ang);
       if(q[0]>24&&q[0]<AW-24&&q[1]>24&&q[1]<AH-24) break; }
-    if(k>23) return;                  // aucune place hors champ: on renonce
+    if(k>23) return;                  // no spot off screen: give up
     x=q[0]; y=q[1]; }
   var hp=t[6]*(1+T*0.010);
   ents.push({t:type,x:x,y:y,hp:hp,mhp:hp,r:t[8],spd:t[7]*rr(0.85,1.18)*(1+mn(0.3,T*0.003)),
     fl:0,burn:0,slow:0,stun:0,sh:type===2?1:0,st:0,cd:rr(0.6,2.2),face:1,bob:rnd()*9,orbCd:0,
-    // wb/ws/wq: elle louvoie au lieu de foncer droit.
-    // ld: une sur deux anticipe ta trajectoire au lieu de te suivre,
-    //     sinon il suffit de tourner autour du troupeau pour gagner.
+    // wb/ws/wq: she weaves instead of charging straight in.
+    // ld: one in two leads your path instead of following you,
+    //     otherwise circling the herd is enough to win.
     wb:rnd()*TAU, ws:rr(0.8,2.2)*(rnd()<0.5?-1:1), wq:rr(0.15,0.55),
     ld:rnd()<0.5?rr(0.3,0.85):0});
 }
@@ -468,7 +468,7 @@ function killEnemy(e){
   shake=mn(shake+1.6,10); freeze=mx(freeze,0.045);
   ring(e.x,e.y,e.r*0.4,e.r*2.8,'#fff',0.26);
   ring(e.x,e.y,e.r*0.2,e.r*4.2,ET[e.t][3],0.5);
-  // la tete se detache et continue de sourire en rebondissant
+  // the head comes off and keeps smiling as it bounces
   gibs.push({x:e.x,y:e.y,vx:rr(-130,130),vy:rr(-60,60),z:12,vz:rr(210,400),
     rot:0,vr:rr(-11,11),t:e.t,l:1.6,k:ET[e.t][8]/19});
   var n=ET[e.t][9]*2;
@@ -485,7 +485,7 @@ function hurtPlayer(){
   if(lit<=0){ mode='dead'; musOn&&musGain&&(musGain.gain.value=0.12); wdEnd(0); return; }
   var lost=slot[lit-1];
   say(P.x,P.y,'LOST '+UP[lost][0],'#ff3355',1.3);
-  lit--; if(lit===1) wdAward('THIN_RED_LINE');
+  lit--; if(lit===1&&lvl>6) wdAward('THIN_RED_LINE');   // down to one band, after having had them all
   recalc();
   burst(P.x,P.y,GRAY[0],22,220);
   if(lost===19||S.nova){ // supernova triggers on the way down
@@ -526,17 +526,17 @@ function update(dt){
     var dd=hyp(mvx,mvy); if(dd){ mvx/=dd; mvy/=dd; } }
   P.vx=mvx*S.spd*mag; P.vy=mvy*S.spd*mag;
   P.x+=mvx*S.spd*mag*dt; P.y+=mvy*S.spd*mag*dt;
-  // trainee de couleur quand tu cours
+  // a trail of colour when you run
   if((mvx||mvy)&&rnd()<0.55) parts.push({x:P.x+rr(-6,6),y:P.y+10,vx:rr(-16,16),
     vy:rr(-24,4),l:0.34,c:BAND[ri(mx(1,lit))],s:3});
   P.x=mx(20,mn(AW-20,P.x)); P.y=mx(20,mn(AH-20,P.y));
 
-  // ---- visee automatique: le joueur ne fait que se deplacer ----
+  // ---- auto aim: all the player does is move ----
   var tg=nearest(P.x,P.y,9e9)||boss;
   if(tg) P.ang=atan(tg.y-P.y,tg.x-P.x);
   P.face=cos(P.ang)<0?-1:1;
 
-  // ---- tir: seulement s'il y a quelque chose a portee de plomb ----
+  // ---- firing: only if something is within buckshot range ----
   P.fireCd-=dt;
   if(P.fireCd<=0){ var FR=620*S.rng*1.06;
     if(nearest(P.x,P.y,FR)||(boss&&hyp(boss.x-P.x,boss.y-P.y)<FR+boss.r)){
@@ -546,7 +546,7 @@ function update(dt){
   if(P.ifr>0) P.ifr-=dt;
   if(lit<lvl){ regenT+=dt; if(regenT>=S.regen){ regenT=0; lit++; wdAward('PAINT_IT_BACK'); recalc(); sPaint();
     burst(P.x,P.y,BAND[lit-1],18,190);
-    // la bande revient: l'ecran prend sa couleur un instant
+    // the band comes back: the screen takes its colour for a moment
     flashT=0.28; flashC=BAND[lit-1];
     ring(P.x,P.y,12,240,BAND[lit-1],0.45); say(P.x,P.y,UP[slot[lit-1]][0]+' BACK',BAND[lit-1],1.2);
   } } else regenT=0;
@@ -587,7 +587,7 @@ function update(dt){
     if(texts[ti].l<=0) texts.splice(ti,1); }
   for(var gi=gibs.length-1;gi>=0;gi--){ var gb=gibs[gi];
     gb.l-=dt; gb.x+=gb.vx*dt; gb.y+=gb.vy*dt; gb.rot+=gb.vr*dt;
-    gb.z+=gb.vz*dt; gb.vz-=1100*dt;           // saut vertical puis rebond au sol
+    gb.z+=gb.vz*dt; gb.vz-=1100*dt;           // vertical hop, then a bounce on the ground
     if(gb.z<0){ gb.z=0; gb.vz*=-0.42; gb.vx*=0.72; gb.vy*=0.72; gb.vr*=0.6; }
     if(gb.l<=0) gibs.splice(gi,1); }
   updEnemies(dt); updShots(dt); updHearts(dt); updDrops(dt); updParts(dt); updBoss(dt);
@@ -644,11 +644,11 @@ function updShots(dt){
 
 function updEnemies(dt){
   for(var i=ents.length-1;i>=0;i--){
-    // deux licornes peuvent mourir dans la meme iteration (ARC, HALO,
-    // SUPERNOVA): le tableau raccourcit plus vite que l'indice.
+    // two unicorns can die in the same iteration (ARC, HALO,
+    // SUPERNOVA): the array shrinks faster than the index.
     var e=ents[i]; if(!e) continue;
     var t=ET[e.t];
-    // semee trop loin derriere, elle renonce
+    // shaken off too far behind, she gives up
     if(Math.abs(e.x-P.x)>2400||Math.abs(e.y-P.y)>2400){ ents.splice(i,1); continue; }
     if(e.fl>0) e.fl-=dt;
     if(e.burn>0){ e.burn-=dt; e.hp-=6*dt;
@@ -667,7 +667,7 @@ function updEnemies(dt){
     var tx=P.x+P.vx*e.ld, ty=P.y+P.vy*e.ld;
     if(mirage&&mirage.l>0&&hyp(mirage.x-e.x,mirage.y-e.y)<330){ tx=mirage.x; ty=mirage.y; }
     var dx=tx-e.x, dy=ty-e.y;
-    // on fait tourner le vecteur: la distance reste juste, seul le cap devie
+    // we rotate the vector: the distance stays correct, only the heading drifts
     e.wb+=e.ws*dt;
     var wa=sin(e.wb)*e.wq, cw=cos(wa), sw=sin(wa), oxd=dx;
     dx=dx*cw-dy*sw; dy=oxd*sw+dy*cw;
@@ -770,34 +770,34 @@ function updBoss(dt){
 }
 
 // ---------- rendering ----------
-// Pierres et arbres, semes une fois pour toutes par un generateur a graine
-// fixe: memes positions a chaque partie, et zero octet de stockage.
-// Pure decoration, ils n'arretent ni le heros ni les licornes.
+// Rocks and trees, scattered once and for all by a generator with a fixed
+// seed: same positions every run, and zero bytes of storage.
+// Pure decoration, they stop neither the hero nor the unicorns.
 var PROPS=(function(){ var r=mulb(77), a=[], i;
   for(i=0;i<700;i++){ var t=r();
     a.push([r()*AW,r()*AH,t<0.62?2:t<0.81?1:0,0.6+r()*0.85]); }
   return a; })();
-// back=1: avant les personnages. back=0: apres, donc devant eux.
-// Seuls les arbres se trient en profondeur, l'herbe et les pierres
-// restent toujours au sol.
+// back=1: before the characters. back=0: after, so in front of them.
+// Only the trees are depth-sorted, the grass and the rocks
+// always stay on the ground.
 function drawProps(back){
-  // On compare les points de CONTACT AU SOL, pas les ancres: les pieds du
-  // heros sont 36 unites sous son ancre, le pied du tronc 6 sous la sienne.
+  // We compare GROUND CONTACT points, not anchors: the feet of the
+  // hero are 36 units below his anchor, the foot of the trunk 6 below its own.
   var gy=P.y+21;
   for(var i=0;i<PROPS.length;i++){ var p=PROPS[i], k=p[2], tg=p[1]+p[3]*6;
     if(p[0]<camX-70||p[0]>camX+W+70||p[1]<camY-90||p[1]>camY+H+70) continue;
     if(back ? (k===1&&tg>=gy) : (k!==1||tg<gy)) continue;
     V=X; X.save(); X.translate(p[0],p[1]); X.scale(p[3],p[3]);
-    if(k===2){                                         // une touffe: trois pixels
+    if(k===2){                                         // a tuft: three pixels
       X.fillStyle='#1c6b3a'; X.fillRect(-5,-5,5,5); X.fillRect(2,-8,5,5);
       X.fillStyle='#3fb56a'; X.fillRect(-2,-2,3,3);
       X.restore(); continue; }
-    el(0,3,19,6,'rgba(0,0,0,0.26)');                   // l'ombre au sol
-    if(k){                                             // un arbre
+    el(0,3,19,6,'rgba(0,0,0,0.26)');                   // the shadow on the ground
+    if(k){                                             // a tree
       rct(-5,-19,10,25,4,'#6b4a2e');
       el(0,-33,21,18,'#2f6b48'); el(-10,-25,13,11,'#3d8a5e');
       el(10,-27,11,10,'#3d8a5e'); el(-4,-39,9,8,'#59ab7a');
-    } else {                                           // une pierre
+    } else {                                           // a rock
       el(0,-1,17,12,'#7d8a86'); el(-4,-5,11,8,'#9aa8a3'); el(6,2,7,5,'#5e6b68');
     }
     X.restore(); }
@@ -829,7 +829,7 @@ function drawHero(x,y){
     if(cos(P.ang)<0) X.scale(1,-1);
     X.drawImage(GUNS,0,-GUNS.height/2);
     if(k>0){ X.globalCompositeOperation='lighter';
-      X.fillStyle='#ff9a3d'; X.beginPath();       // une gerbe courte, rien de plus
+      X.fillStyle='#ff9a3d'; X.beginPath();       // a short flare, nothing more
       X.moveTo(42,0); X.lineTo(60,-11); X.lineTo(74,0); X.lineTo(60,11); X.closePath(); X.fill();
       X.fillStyle='#fff3c0'; X.beginPath(); X.arc(48,0,7,0,TAU); X.fill();
       X.fillStyle='#fff'; X.beginPath(); X.arc(45,0,3.5,0,TAU); X.fill(); }
@@ -841,9 +841,13 @@ function drawEnemy(e){
   X.save(); X.translate(e.x,e.y+bo);
   X.fillStyle='rgba(0,0,0,0.3)'; X.beginPath(); X.ellipse(0,h/2-2-bo,w*0.3,4,0,0,TAU); X.fill();
   if(e.t===3&&e.st===1) X.rotate(-0.45*e.face);
-  var sq=1+e.fl*2.4;                       // ecrasement a l'impact
+  var sq=1+e.fl*2.4;                       // squash on impact
   X.scale(e.face*sq,1/sq);
   X.drawImage(s,-w/2,-h/2,w,h);
+  // Keep the unicorn faces readable after the arcade canvas is reduced.
+  X.fillStyle='#fff'; X.beginPath(); X.arc(w*.12,-h*.12,w*.075,0,TAU); X.arc(w*.30,-h*.12,w*.075,0,TAU); X.fill();
+  X.fillStyle='#150719'; X.beginPath(); X.arc(w*.14,-h*.11,w*.032,0,TAU); X.arc(w*.32,-h*.11,w*.032,0,TAU); X.fill();
+  X.fillStyle='#ffd257'; X.beginPath(); X.moveTo(w*.18,-h*.34); X.lineTo(w*.25,-h*.34); X.lineTo(w*.215,-h*.52); X.closePath(); X.fill();
   X.restore();
   if(e.sh){ X.save(); X.globalCompositeOperation='lighter'; X.globalAlpha=0.5+sin(T*9)*0.2;
     X.strokeStyle='#9df5e6'; X.lineWidth=2; X.beginPath(); X.arc(e.x,e.y,e.r+6,0,TAU); X.stroke(); X.restore(); }
@@ -866,7 +870,7 @@ function drawBoss(){
   var b=boss, bo=sin(b.bob)*4, i, h;
   X.save(); X.translate(b.x,b.y+bo);
 
-  // les meches volees jaillissent du centre, une par phase restante
+  // the stolen strands burst out of the middle, one per remaining phase
   X.save(); X.globalCompositeOperation='lighter';
   X.lineWidth=10; X.lineCap='round';
   for(i=6;i>=0;i--){ if(i<b.phase) continue;
@@ -876,7 +880,7 @@ function drawBoss(){
     X.stroke(); }
   X.restore();
 
-  // quatre cous serpentins qui ondulent, retombent quand la tete meurt
+  // four snaking necks that ripple, and flop down when the head dies
   var hp=[[-1,.5],[-.42,-.2],[.42,-.2],[1,.5]];
   for(h=0;h<4;h++){
     var p=hp[h], dead=h>=4-Math.ceil(b.phase*4/7),
@@ -893,7 +897,7 @@ function drawBoss(){
     if(p[0]>0) X.scale(-1,1);
     X.scale(1.9,1.9); X.drawImage(hh,-hh.ox,-hh.oy); X.restore(); }
 
-  // le coeur, compact et blinde
+  // the core, compact and armoured
   X.fillStyle='#2b1140'; X.beginPath(); X.ellipse(0,20,54,44,0,0,TAU); X.fill();
   X.fillStyle='#c48fe0'; X.beginPath(); X.ellipse(0,20,50,40,0,0,TAU); X.fill();
   X.fillStyle='#d9a8f0'; X.beginPath(); X.ellipse(0,12,38,28,0,0,TAU); X.fill();
@@ -910,7 +914,7 @@ function render(){
   X.save(); X.translate(sx-camX,sy-camY);
   drawGrid(); drawProps(1);
 
-  // halo doux sous le heros: le sol respire autour de toi
+  // soft halo under the hero: the ground breathes around you
 
   // drops
   X.save(); X.globalCompositeOperation='lighter';
@@ -952,7 +956,7 @@ function render(){
     X.lineTo(z.x2,z.y2); X.stroke(); }
   X.restore();
 
-  // ondes de choc
+  // shock waves
   X.save(); X.globalCompositeOperation='lighter';
   for(i=0;i<rings.length;i++){ var rg=rings[i], kk=1-rg.l/rg.L;
     X.globalAlpha=(1-kk)*0.85; X.strokeStyle=rg.c; X.lineWidth=1+5*(1-kk);
@@ -969,7 +973,7 @@ function render(){
   X.restore();
 
 
-  // les tetes detachees, qui sourient encore
+  // the severed heads, still smiling
   for(i=0;i<gibs.length;i++){ var gb=gibs[i], hh=eHead[gb.t];
     X.save(); X.globalAlpha=mn(1,gb.l*2.2);
     X.translate(gb.x,gb.y-gb.z); X.rotate(gb.rot); X.scale(gb.k,gb.k);
@@ -977,7 +981,7 @@ function render(){
   X.globalAlpha=1;
 
   drawHero(P.x,P.y);
-  drawProps(0);          // les arbres devant lesquels tu es passe
+  drawProps(0);          // the trees you have walked past
   for(i=0;i<texts.length;i++){ var tp=texts[i], b=1-tp.l;
     X.globalAlpha=mn(1,tp.l*2.5); otext(tp.t,tp.x,tp.y-18-34*b,14*tp.z,tp.c,1); }
   X.globalAlpha=1;
@@ -990,9 +994,9 @@ function render(){
   X.restore();
 
   // vignette
-  X.restore();                       // fin du repere monde
+  X.restore();                       // end of world space
 
-  // calques plein ecran: ils ne doivent PAS suivre la camera
+  // full-screen layers: they must NOT follow the camera
   if(lit<=1&&mode==='play'){ X.fillStyle='rgba(255,40,90,'+(0.05+0.07*Math.abs(sin(T*7)))+')';
     X.fillRect(0,0,W,H); }
   if(flashT>0){ X.globalAlpha=flashT*0.55; X.fillStyle=flashC; X.fillRect(0,0,W,H); X.globalAlpha=1; }
@@ -1004,14 +1008,14 @@ function render(){
   if(bossWarn>0&&mode==='play'){ X.fillStyle='rgba(255,60,120,'+(0.4+sin(T*18)*0.3)+')';
     X.font='bold '+mn(46,W/12)+'px monospace'; X.textAlign='center';
     X.fillText('IT IS COMING',W/2,H/2-60); }
-  // le bandeau de trophee passe apres l'ecran de fin: sinon les trophees de
-  // victoire seraient recouverts a la frame meme ou ils tombent
+  // the achievement banner is drawn after the end screen: otherwise the win
+  // achievements would be covered over on the very frame they land
   if(wdBq.length){ X.globalAlpha=mn(1,wdBl*1.6);
     otext(wdBq[0],W/2,46,19,'#ffd42e',1); X.globalAlpha=1; X.textAlign='left'; }
   scan();
 }
-// une ligne interne sur deux assombrie, comme un tube cathodique.
-// Doit etre la derniere chose dessinee: elle repasse en repere interne.
+// every other internal line darkened, like a cathode ray tube.
+// Must be the last thing drawn: it switches back to internal coordinates.
 function scan(){ X.setTransform(1,0,0,1,0,0); X.fillStyle='rgba(0,0,0,0.22)';
   for(var sl=1;sl<C.height;sl+=2) X.fillRect(0,sl,C.width,1); }
 
@@ -1039,7 +1043,7 @@ function hud(){
   X.lineWidth=3; X.strokeStyle=OUT; X.strokeText(kills+' kills',W-14,28);
   X.fillStyle='#fff'; X.fillText(kills+' kills',W-14,28);
   X.textAlign='left';
-  // carte reduite: le monde, les licornes, et ou tu te trouves dedans
+  // minimap: the world, the unicorns, and where you sit in it
   var mw=mn(96,W*0.16), mh=mw*AH/AW, m0=W-mw-14, n0=48;
   X.globalAlpha=0.72; X.fillStyle='#0d0518'; X.fillRect(m0,n0,mw,mh);
   X.globalAlpha=1; X.strokeStyle='#5e2b8a'; X.lineWidth=1;
@@ -1053,7 +1057,7 @@ function hud(){
 
   // joystick virtuel
   if(isTouch){ X.save();
-    if(!stick.on){                               // ou poser le pouce
+    if(!stick.on){                               // where to put your thumb
       X.globalAlpha=0.10; X.strokeStyle='#fff'; X.lineWidth=3;
       X.beginPath(); X.arc(W*0.2,H-SMAX-30,SMAX,0,TAU); X.stroke();
       X.fillStyle='#fff'; X.beginPath(); X.arc(W*0.2,H-SMAX-30,26,0,TAU); X.fill(); }
@@ -1100,13 +1104,13 @@ function endScreen(t,sub){
   var w=mode==='win', m=mn(W,H), cx=W/2, cy=H/2, i, q;
   X.fillStyle=w?'rgba(10,4,24,0.8)':'rgba(6,2,12,0.9)'; X.fillRect(0,0,W,H);
 
-  // la pluie de couleurs volees, quand tu les as reprises
+  // the rain of stolen colours, now that you have them back
   if(w) for(i=0;i<44;i++){ q=(T*130+i*151)%(H+70);
     X.globalAlpha=0.85; X.fillStyle=BAND[i%7];
     X.fillRect((i*179)%W,q-70,4,14); }
   X.globalAlpha=1;
 
-  // toi, en grand: tout gris si tu as fondu, rallume si tu as gagne
+  // you, full size: all grey if you faded, lit back up if you won
   var hs=heroSpr(w?7:0,7,110), z=m*0.32/(110*2.06);
   X.save(); X.translate(cx,cy-m*0.19+(w?sin(T*2)*4:0)); X.scale(z,z);
   if(!w) X.rotate(0.22);
@@ -1114,14 +1118,14 @@ function endScreen(t,sub){
 
   X.textAlign='center';
   X.fillStyle=w?'#ffd42e':'#8a8098';
-  // la police suit la longueur du titre: sinon 'YOU GOT YOUR COLOURS BACK'
-  // deborde de l'ecran en portrait
+  // the font follows the title length: otherwise 'YOU GOT YOUR COLOURS BACK'
+  // overflows the screen in portrait
   var ty=cy+m*0.06, th=5*ppx(38,t.length)/K;
   X.font='38px m'; X.fillText(t,cx,ty);
   X.fillStyle='rgba(255,255,255,0.5)'; X.font='14px m';
   X.fillText(sub,cx,ty+th*0.9);
 
-  // les sept bandes: jusqu'ou tu es monte, et ce qu'il te restait
+  // the seven bands: how far you climbed, and what you had left
   var bw=mn(34,W/11);
   for(i=0;i<7;i++){ X.fillStyle=i<lit?BAND[i]:(i<lvl?GRAY[i]:'#241a38');
     X.fillRect(cx-bw*3.5+i*bw+1,cy+m*0.12,bw-3,10); }
@@ -1135,9 +1139,9 @@ function endScreen(t,sub){
 }
 
 // ---------- title ----------
-// Quatre licornes se penchent des coins et te pointent du doigt en riant.
-// Toi, au milieu, tu es minuscule et tu as les bras croises.
-var HR=120;                                  // resolution des tetes du titre
+// Four unicorns lean in from the corners and point at you, laughing.
+// You, in the middle, are tiny, with your arms crossed.
+var HR=120;                                  // resolution of the title heads
 var tHead=[mkHead('#a8ecdc','#6fc9b8','#ffb3e0','#c97fb0',1,HR),
            mkHead('#f5c4ff','#c08fd6','#a8e8dc','#6fb8c9',1,HR),
            mkHead('#d9b8ff','#a88fd6','#ffc4a8','#d69f7f',1,HR),
@@ -1145,17 +1149,17 @@ var tHead=[mkHead('#a8ecdc','#6fc9b8','#ffb3e0','#c97fb0',1,HR),
 var STARS=(function(){ var r=mulb(11), a=[], i;
   for(i=0;i<110;i++) a.push([r(),r(),r()*2.2+0.7,r()]); return a; })();
 
-// une etincelle a quatre branches
+// a four-pointed spark
 
-// texte cerne de noir: lisible sur n'importe quel fond
+// text outlined in black: readable on any background
 function otext(t,x,y,fs,c){ X.font=fs+'px m'; X.textAlign='center';
   X.strokeText(t,x,y); X.fillStyle=c; X.fillText(t,x,y); }
-// LE JURY: les quatre tetes en rang au sommet, penchees sur toi comme un
-// tribunal, et un cone de lumiere qui ne tombe que sur toi, tout en bas.
+// THE JURY: the four heads lined up at the top, leaning over you like a
+// tribunal, and a cone of light that falls on you alone, right at the bottom.
 function drawTitle(){
   var i, m=mn(W,H), cx=W/2;
 
-  // la nuit et ses etoiles
+  // the night and its stars
   X.fillStyle='#000'; X.fillRect(0,0,W,H);
   for(i=0;i<STARS.length;i++){ var st=STARS[i];
     X.globalAlpha=0.25+0.6*Math.abs(sin(T*1.5+st[3]*9));
@@ -1163,20 +1167,20 @@ function drawTitle(){
     X.fillRect(st[0]*W,st[1]*H,st[2],st[2]); }
   X.globalAlpha=1;
 
-  // le cone de lumiere
+  // the cone of light
   X.save(); X.globalCompositeOperation='lighter';
   X.fillStyle='rgba(255,240,200,0.09)'; X.beginPath(); X.moveTo(cx-m*0.06,0); X.lineTo(cx+m*0.06,0);
   X.lineTo(cx+m*0.42,H); X.lineTo(cx-m*0.42,H); X.closePath(); X.fill(); X.restore();
 
-  // le jury
+  // the jury
   var hw=mn(W*0.22,H*0.16), k=hw/(HR*1.32);
   for(i=0;i<4;i++){ var hd=tHead[i], lg2=sin(T*7+i*1.7);
     X.save(); X.translate(W*(0.14+i*0.24),H*0.1+lg2*3); X.scale(i>1?-1:1,1);
     X.rotate(0.55+lg2*0.05); X.scale(k,k); X.drawImage(hd,-hd.ox,-hd.oy); X.restore(); }
 
-  // toi, tout en bas, seul dans la lumiere
+  // you, right at the bottom, alone in the light
   var hs=heroSpr(7,7,150);
-  // le titre: sept lettres cernees, chacune avec son halo
+  // the title: seven outlined letters, each with its own halo
   var fs=mn(120,W/6.2,H*0.1)|0, y=H*0.1+hw*0.6+fs;
   X.font='bold '+fs+'px monospace'; X.textAlign='left';
   var ti='ROYGBIV', ox=cx-X.measureText(ti).width/2;
@@ -1192,7 +1196,7 @@ function drawTitle(){
     ptext(q[0],cx+1/K,yy+1/K,0,OUT,'center',tp); ptext(q[0],cx,yy,0,q[1],'center',tp); });
   var by=y+l*3.9;
 
-  // le heros prend la place qui reste entre le texte et l'invite
+  // the hero takes the room left between the text and the prompt
   var av=H-52-by, sc=mn(m*0.26/309,av/hs.height);
   X.save(); X.translate(cx,by+(av-hs.height*sc)/2+hs.oy*sc+sin(T*2)*3); X.scale(sc,sc);
   
@@ -1204,37 +1208,37 @@ function drawTitle(){
 }
 
 // ---------- wavedash ----------
-// Le global est injecte par la plateforme AVANT le code du jeu. Ailleurs il
-// n'existe pas, et la garde rend le bloc inerte : sur js13kgames.com la partie
-// se deroule exactement comme si ces lignes n'etaient pas la. Rien n'est
-// telecharge, la regle "aucune ressource externe" tient.
-// Sans init(), le jeu reste cache derriere l'ecran de chargement de Wavedash
-// et n'apparait jamais.
-// Un garde PAR appel : un try/catch partage ferait tomber ensemble des
-// methodes independantes si l'une venait a disparaitre du SDK.
+// The global is injected by the platform BEFORE the game code. Anywhere else it
+// does not exist, and the guard makes the block inert: on js13kgames.com the game
+// runs exactly as if these lines were not here. Nothing is
+// downloaded, the "no external resources" rule holds.
+// Without init(), the game stays hidden behind the Wavedash loading screen
+// and never appears.
+// One guard PER call: a shared try/catch would take down independent
+// methods together if one of them ever vanished from the SDK.
 var WD=self.Wavedash, wdOk=0, wdQ=[], wdG={}, wdHit=0, wdBq=[], wdBl=0;
 function wdCall(method,...args){ try{ var r=WD&&WD[method]&&WD[method](...args);
   return r&&r.then?r.catch(function(){}):r; }catch(e){} }
-// setAchievement() ne fait rien tant que requestStats() n'a pas repondu : les
-// trophees gagnes avant sont mis en attente, pas perdus.
+// setAchievement() does nothing until requestStats() has answered: the
+// achievements earned before that are queued, not lost.
 function wdFlush(){ if(!wdOk) return;
   while(wdQ.length){ var i=wdQ[0];
     if(wdCall('getAchievement',i)!==true&&wdCall('setAchievement',i,true)!==true) return;
     wdQ.shift(); } }
-// Le bandeau ne depend pas de la plateforme : il s'affiche aussi sur
-// js13kgames.com, ou les votants sont. Le libelle se derive de l'identifiant,
-// ce qui evite d'embarquer une table de titres.
+// The banner does not depend on the platform: it shows up on
+// js13kgames.com too, where the voters are. The label is derived from the id,
+// which avoids shipping a table of titles.
 function wdAward(i){ if(wdG[i]) return; wdG[i]=1;
   if(wdBq.push(i.replace(/_/g,' '))===1) wdBl=2.6;
   wdQ.push(i); wdFlush(); }
 function wdScore(n,o,d,v){ var p=wdCall('getOrCreateLeaderboard',n,o,d);
   p&&p.then&&p.then(function(r){ if(r&&r.success&&r.data&&r.data.id)
     wdCall('uploadLeaderboardScore',r.data.id,v|0,true); }); }
-// Fin de partie, gagnee ou perdue. Un score de zero reste un score.
+// End of run, won or lost. A score of zero is still a score.
 function wdEnd(w){ wdScore('unicorns-felled-v1',1,0,kills);
   if(w){ wdAward('ROYGBIV');
     if(lit>=7) wdAward('PERFECT_PRISM');
-    if(T<150) wdAward('SPEED_OF_LIGHT');     // 150 s : une victoire pilotee en a pris 167
+    if(T<150) wdAward('SPEED_OF_LIGHT');     // 150 s: a scripted playthrough took 167
     wdScore('fastest-rainbow-v1',0,1,T); } }
 wdCall('init');
 var wdS=wdCall('requestStats');
@@ -1246,7 +1250,7 @@ var last=0;
 function loop(t){ var dt=mn(0.05,(t-last)/1000)||0; last=t;
   if(wdBq.length&&(wdBl-=dt)<=0){ wdBq.shift(); wdBl=2.6; }
   if(mode==='title') T+=dt;
-  // arret sur image: le monde se fige un instant sur les impacts marquants
+  // freeze frame: the world freezes for a moment on the hits that matter
   if(freeze>0){ freeze-=dt; dt*=0.14; }
   update(dt); render(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);

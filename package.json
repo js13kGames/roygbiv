@@ -6,9 +6,7 @@
   "private": true,
   "scripts": {
     "build": "bash build.sh",
-    "gen80": "python3 mk80.py",
-    "test": "bash test/run.sh",
-    "build:alt": "bash build.sh index.html"
+    "test": "bash test/run.sh"
   },
   "devDependencies": {
     "roadroller": "^2.1.0",

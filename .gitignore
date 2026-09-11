@@ -1,7 +1,19 @@
 node_modules/
 dist/
 *.bak.html
+
+# Build and check artefacts
 .js13k-check/
 .gen-img/
 .shots/
 media/.js13k-images/
+
+# Art-direction labs: throwaway pages used to settle the visual direction.
+# Kept on disk, out of the submitted repository.
+tools/
+
+# Full-resolution image sources, kept locally to re-encode the PNGs if needed.
+media/*-source.jpg
+
+# Local capture logs
+logs/

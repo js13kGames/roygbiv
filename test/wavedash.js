@@ -1,15 +1,15 @@
-// Verifie l'integration Wavedash sans plateforme, sur les DEUX versions.
+// Checks the Wavedash integration with no platform, on BOTH versions.
 //
-// Le stub imite le SDK reel : il VALIDE LES TYPES, exactement comme lui. Un
-// stub permissif ne teste rien -- c'est precisement ce qui laisse passer le
-// bug ou terser reecrit true en 1 et ou chaque appel est rejete en silence.
+// The stub mimics the real SDK: it VALIDATES TYPES, exactly as it does. A
+// permissive stub tests nothing -- that is exactly what lets through the bug
+// where terser rewrites true as 1 and every call is rejected in silence.
 const fs = require('fs');
 const path = require('path');
 const H = require(path.join(__dirname, 'harness.js'));
 
-const FILE = process.argv[2] || 'index.html';
+const FILE = process.argv[2] || 'src/index-80.html';
 let fail = 0;
-function ok(c, m) { console.log('  ' + (c ? 'ok  ' : 'ECHEC ') + m); if (!c) fail = 1; }
+function ok(c, m) { console.log('  ' + (c ? 'ok  ' : 'FAIL  ') + m); if (!c) fail = 1; }
 
 function makeSdk(opts) {
   opts = opts || {};
@@ -30,16 +30,16 @@ function makeSdk(opts) {
       },
       getAchievement(id) { vStr(id, 'identifier'); calls.get++; return unlocked.has(id); },
       setAchievement(id, storeNow) {
-        vStr(id, 'identifier'); vBool(storeNow, 'storeNow');      // le piege des booleens
+        vStr(id, 'identifier'); vBool(storeNow, 'storeNow');      // the boolean trap
         calls.set.push(id);
         if (!known.size || known.has(id)) { unlocked.add(id); return true; }
-        return false;                                             // identifiant absent du portail
+        return false;                                             // identifier missing from the portal
       },
       getOrCreateLeaderboard(name, sort, disp) {
         vStr(name, 'name'); vNum(sort, 'sortOrder'); vNum(disp, 'displayType');
         calls.board.push([name, sort, disp]);
         if (opts.boardReject) return Promise.reject(new Error('nope'));
-        // la forme du retour se copie des types generes : c'est `id`, jamais `_id`
+        // the return shape is copied from the generated types: it is `id`, never `_id`
         return Promise.resolve({ success: true, data: { id: 'lb-' + name, name, totalEntries: 0, created: true } });
       },
       uploadLeaderboardScore(id, score, keepBest) {
@@ -52,7 +52,7 @@ function makeSdk(opts) {
   };
 }
 
-// Charge le jeu avec un SDK donne (ou aucun) et rend les leviers accessibles.
+// Loads the game with a given SDK (or none) and makes the levers reachable.
 function boot(sdk, src) {
   H.install(1400, 800, {});
   global.self = global; global.window = global;
@@ -62,7 +62,8 @@ function boot(sdk, src) {
         'kill:killEnemy,hurt:hurtPlayer,spawn:spawnEnemy,ents:function(){return ents;},' +
         'award:wdAward,end:wdEnd,banner:function(){return wdBq.slice();},' +
         'set:function(k,v){if(k==="kills")kills=v;if(k==="lit")lit=v;if(k==="lvl")lvl=v;' +
-        'if(k==="T")T=v;if(k==="mode")mode=v;},press:function(o){keys=o;}};';
+        'if(k==="T")T=v;if(k==="mode")mode=v;if(k==="slot")slot=v;if(k==="ifr")P.ifr=v;},' +
+        'press:function(o){keys=o;}};';
   (0, eval)(js);
   return globalThis.__G;
 }
@@ -73,56 +74,56 @@ const tick = () => new Promise(r => setImmediate(r));
 (async function () {
   console.log('════════ ' + FILE);
 
-  // 1. sans plateforme : le jeu doit tourner et ne rien tenter.
+  // 1. no platform: the game must run and attempt nothing.
   {
     const G = boot(null, raw);
     G.start(); G.camera(); G.update(1 / 60); G.render();
     G.award('FIRST_BLOOD');
     G.camera(); G.update(1 / 60); G.render();
-    ok(G.banner()[0] === 'FIRST BLOOD', 'sans SDK : le bandeau maison s\'affiche quand meme');
+    ok(G.banner()[0] === 'FIRST BLOOD', 'no SDK: the in-house banner still shows');
   }
 
-  // 2. avec un SDK complet : init, stats, trophees, classements.
+  // 2. with a full SDK: init, stats, achievements, leaderboards.
   {
     const s = makeSdk({});
     const G = boot(s.api, raw);
-    ok(s.calls.init === 1, 'init() appele une fois');
-    ok(s.calls.stats === 1, 'requestStats() appele au demarrage');
+    ok(s.calls.init === 1, 'init() called once');
+    ok(s.calls.stats === 1, 'requestStats() called at startup');
     await tick(); await tick();
     G.start();
-    G.award('FIRST_BLOOD'); G.award('FIRST_BLOOD');           // deux fois : un seul envoi
+    G.award('FIRST_BLOOD'); G.award('FIRST_BLOOD');           // twice: sent once
     await tick(); await tick();
-    ok(s.calls.set.length === 1 && s.calls.set[0] === 'FIRST_BLOOD', 'un trophee ne part qu\'une fois');
-    ok(G.banner().length === 1, 'le bandeau ne se repete pas non plus');
+    ok(s.calls.set.length === 1 && s.calls.set[0] === 'FIRST_BLOOD', 'an achievement is sent only once');
+    ok(G.banner().length === 1, 'the banner does not repeat either');
 
     G.set('kills', 343); G.set('lit', 7); G.set('T', 120);
     G.end(1);
     await tick(); await tick(); await tick();
     const ids = s.calls.set.join(',');
-    ok(/ROYGBIV/.test(ids), 'victoire : ROYGBIV');
-    ok(/PERFECT_PRISM/.test(ids), 'victoire 7 bandes : PERFECT_PRISM');
-    ok(/SPEED_OF_LIGHT/.test(ids), 'victoire sous 150 s : SPEED_OF_LIGHT');
+    ok(/ROYGBIV/.test(ids), 'win: ROYGBIV');
+    ok(/PERFECT_PRISM/.test(ids), 'win with all seven bands: PERFECT_PRISM');
+    ok(/SPEED_OF_LIGHT/.test(ids), 'win under 150 s: SPEED_OF_LIGHT');
     const names = s.calls.board.map(b => b[0]);
-    ok(names.indexOf('unicorns-felled-v1') >= 0, 'classement des kills cree');
-    ok(names.indexOf('fastest-rainbow-v1') >= 0, 'classement du temps cree');
+    ok(names.indexOf('unicorns-felled-v1') >= 0, 'kills leaderboard created');
+    ok(names.indexOf('fastest-rainbow-v1') >= 0, 'time leaderboard created');
     ok(s.calls.board.every(b => typeof b[1] === 'number' && typeof b[2] === 'number'),
-       'enumerations passees en nombres');
-    ok(s.calls.upload.length === 2, 'deux scores envoyes');
-    ok(s.calls.upload.every(u => u[2] === true), 'keepBest est un VRAI booleen (piege terser)');
-    ok(s.calls.upload.every(u => Number.isFinite(u[1])), 'les scores sont des nombres finis');
+       'enums passed as numbers');
+    ok(s.calls.upload.length === 2, 'two scores sent');
+    ok(s.calls.upload.every(u => u[2] === true), 'keepBest is a REAL boolean (terser trap)');
+    ok(s.calls.upload.every(u => Number.isFinite(u[1])), 'the scores are finite numbers');
   }
 
-  // 3. un score de zero reste un score : il ne doit pas etre filtre.
+  // 3. a score of zero is still a score: it must not be filtered out.
   {
     const s = makeSdk({});
     const G = boot(s.api, raw);
     await tick(); await tick();
     G.start(); G.set('kills', 0); G.end(0);
     await tick(); await tick();
-    ok(s.calls.upload.length === 1 && s.calls.upload[0][1] === 0, 'un score nul est bien envoye');
+    ok(s.calls.upload.length === 1 && s.calls.upload[0][1] === 0, 'a score of zero is sent all the same');
   }
 
-  // 4. trophee gagne AVANT la reponse des stats : mis en attente, pas perdu.
+  // 4. achievement earned BEFORE the stats reply: queued, not lost.
   {
     let release;
     const s = makeSdk({});
@@ -130,41 +131,59 @@ const tick = () => new Promise(r => setImmediate(r));
     const G = boot(s.api, raw);
     G.start(); G.award('FIRST_BLOOD');
     await tick();
-    ok(s.calls.set.length === 0, 'avant les stats : rien n\'est envoye');
+    ok(s.calls.set.length === 0, 'before the stats: nothing is sent');
     release({ success: true, data: true });
     await tick(); await tick();
-    ok(s.calls.set.length === 1, 'apres les stats : le trophee en attente part');
+    ok(s.calls.set.length === 1, 'after the stats: the queued achievement is sent');
   }
 
-  // 5. SDK casse de toutes les facons : aucune exception ne doit sortir.
+  // 5. SDK broken in every way: no exception may escape.
   for (const opts of [{ statsFail: 1 }, { statsReject: 1 }, { boardReject: 1 }, { uploadReject: 1 }]) {
     const s = makeSdk(opts);
     const G = boot(s.api, raw);
     G.start(); G.award('FIRST_BLOOD'); G.set('kills', 5); G.end(1);
     for (let i = 0; i < 6; i++) await tick();
     G.camera(); G.update(1 / 60); G.render();
-    ok(true, 'SDK degrade (' + Object.keys(opts)[0] + ') : le jeu continue sans exception');
+    ok(true, 'degraded SDK (' + Object.keys(opts)[0] + '): the game keeps running, no exception');
   }
 
-  // 6. methodes absentes : un garde par appel, rien ne tombe en cascade.
+  // 6. missing methods: a guard on each call, no cascade failure.
   {
     const s = makeSdk({});
     const G = boot({ init: s.api.init }, raw);
     G.start(); G.award('FIRST_BLOOD'); G.end(1);
     for (let i = 0; i < 4; i++) await tick();
-    ok(s.calls.init === 1, 'init() passe meme si le reste du SDK manque');
+    ok(s.calls.init === 1, 'init() goes through even if the rest of the SDK is missing');
   }
 
-  // 7. identifiant absent du portail : le SDK renvoie false, on n'insiste pas.
+  // 7. identifier missing from the portal: the SDK returns false, no retry.
   {
     const s = makeSdk({ known: ['ROYGBIV'] });
     const G = boot(s.api, raw);
     await tick(); await tick();
     G.start(); G.award('FIRST_BLOOD');
     for (let i = 0; i < 4; i++) await tick();
-    ok(s.calls.set.length >= 1, 'un identifiant inconnu est tente sans boucler');
+    ok(s.calls.set.length >= 1, 'an unknown identifier is tried without looping');
   }
 
-  console.log(fail ? '  DES TESTS WAVEDASH ONT ECHOUE' : '  wavedash : tout passe');
+  // 8. THIN_RED_LINE is a comeback achievement: falling to a single band only
+  //    counts if all seven were painted first. Both directions are checked,
+  //    otherwise a test that only sees the positive case would let through an
+  //    achievement that still fires too early.
+  for (const [lvl, expected] of [[3, false], [7, true]]) {
+    const s = makeSdk({});
+    const G = boot(s.api, raw);
+    await tick(); await tick();
+    G.start();
+    G.set('slot', [0, 1, 2, 3, 4, 5, 6]);      // valid powers in every band
+    G.set('lvl', lvl); G.set('lit', 2); G.set('ifr', 0); G.set('mode', 'play');
+    G.hurt();                                   // the second band goes out: one is left
+    await tick(); await tick();
+    const fired = s.calls.set.indexOf('THIN_RED_LINE') >= 0;
+    ok(fired === expected, 'THIN RED LINE at ' + lvl + ' painted bands: ' +
+       (expected ? 'fires' : 'does not fire'));
+  }
+
+  console.log(fail ? '  SOME WAVEDASH TESTS FAILED' : '  wavedash: all pass');
   process.exit(fail);
 })();

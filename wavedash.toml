@@ -1,7 +1,7 @@
-# Le game_id vient du Developer Portal ; `wavedash init` le renseigne.
-game_id = ""
-# La cible Wavedash est la page NON compressee : la plateforme n'a pas de limite
-# de taille, et une page lisible rend un bug de la-bas diagnosticable.
-# Ne jamais pointer sur dist/ tout entier : cela enverrait aussi l'archive du concours.
+# The game_id comes from the Developer Portal; `wavedash init` fills it in.
+game_id = "j972e95a2zzmd0g6r0ety27ss18e6gc1"
+# The Wavedash target is the UNCOMPRESSED page: the platform has no size
+# limit, and a readable page makes a bug over there diagnosable.
+# Never point at dist/ as a whole: that would upload the contest archive too.
 upload_dir = "dist/wavedash"
 entrypoint = "index.html"

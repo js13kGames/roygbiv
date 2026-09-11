@@ -1,11 +1,11 @@
-// L'ecran titre ne doit rien chevaucher, en portrait comme en paysage.
+// Nothing on the title screen may overlap, in portrait or in landscape.
 var fs=require('fs');
-var FILE=process.argv[2]||'index.html', BITMAP=FILE.indexOf('80')>=0;
+var FILE=process.argv[2]||'src/index-80.html', BITMAP=FILE.indexOf('80')>=0;
 var L=[], HERO=null, HEADS=[];
 function C(){this.globalAlpha=1;this._f='12px monospace';this.fillStyle='#fff';this.textAlign='left';this.imageSmoothingEnabled=true}
 Object.defineProperty(C.prototype,'font',{get(){return this._f},set(v){this._f=v.replace(/^bold /,'700 ')}});
 ['rotate','beginPath','arc','arcTo','moveTo','lineTo','closePath','fill','stroke','clearRect','clip','ellipse','rect','quadraticCurveTo','bezierCurveTo','strokeRect','setLineDash','fillRect'].forEach(m=>C.prototype[m]=function(){});
-// etat de transformation PAR CONTEXTE: chaque sprite est cuit dans le sien
+// transform state PER CONTEXT: each sprite is baked in a context of its own
 C.prototype.save=function(){ (this._st=this._st||[]).push([this._x||0,this._y||0,this._s||1]); };
 C.prototype.restore=function(){ var v=(this._st||[]).pop();
   if(v){ this._x=v[0]; this._y=v[1]; this._s=v[2]; } };
@@ -29,7 +29,7 @@ global.setInterval=()=>0; global.setTimeout=()=>0;
 global.AudioContext=global.webkitAudioContext=function(){throw 0};
 var LAST=null;
 
-[[390,844,'portrait'],[844,390,'paysage'],[430,932,'grand portrait'],[1920,1080,'desktop']].forEach(function(f){
+[[390,844,'portrait'],[844,390,'landscape'],[430,932,'tall portrait'],[1920,1080,'desktop']].forEach(function(f){
   global.innerWidth=f[0]; global.innerHeight=f[1];
   var src=fs.readFileSync(FILE,'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
   if(BITMAP) src=src.replace('function ptext(t,x,y,fs,c,al,fp){',
@@ -41,19 +41,19 @@ var LAST=null;
   A.render();
   var lines=BITMAP?globalThis.__L.map(function(l){return [l[0],l[1],l[2]];})
                   :L.map(function(l){return [l[0],l[1],l[2]*1.0];});
-  // le heros : dernier drawImage avec une origine
+  // the hero: last drawImage with an origin
   var hero=LAST;
   var prev=-1e9, pb=0, out=[];
   lines.forEach(function(l){ var top=l[1]-l[2];
     var bad=(top<prev-1 && l[0].length>1); if(bad) pb++;
-    out.push('    '+String(l[0]).padEnd(26)+' de '+String(top.toFixed(0)).padStart(5)+' a '+String(l[1].toFixed(0)).padStart(5)+(bad?'  CHEVAUCHE':''));
+    out.push('    '+String(l[0]).padEnd(26)+' from '+String(top.toFixed(0)).padStart(5)+' to '+String(l[1].toFixed(0)).padStart(5)+(bad?'  OVERLAPS':''));
     prev=l[1]; });
   var hs='';
   if(hero){ var chevH=lines.some(function(l){ return l[1]>hero.top && l[1]-l[2]<hero.bot; });
     if(chevH) pb++;
-    hs=' | heros de '+hero.top.toFixed(0)+' a '+hero.bot.toFixed(0)+(chevH?'  CHEVAUCHE LE TEXTE':'')
-       +(hero.bot>d[1]?'  HORS ECRAN':''); }
+    hs=' | hero from '+hero.top.toFixed(0)+' to '+hero.bot.toFixed(0)+(chevH?'  OVERLAPS THE TEXT':'')
+       +(hero.bot>d[1]?'  OFF SCREEN':''); }
   if(pb) process.exitCode=1;
-  console.log('  titre '+(f[2]+'            ').slice(0,15)+' vue '+Math.round(d[0])+'x'+Math.round(d[1])+hs+'  -> '+(pb?pb+' PROBLEMES':'ok'));
+  console.log('  title '+(f[2]+'            ').slice(0,15)+' view '+Math.round(d[0])+'x'+Math.round(d[1])+hs+'  -> '+(pb?pb+' PROBLEMS':'ok'));
   if(pb) out.forEach(function(o){ console.log(o); });
 });

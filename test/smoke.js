@@ -9,18 +9,18 @@ global.document={createElement:()=>new E(),getElementById:()=>new E(),addEventLi
 global.window=global; global.self=global; global.innerWidth=390; global.innerHeight=844; global.devicePixelRatio=2;
 global.addEventListener=()=>{}; global.requestAnimationFrame=()=>0; global.setInterval=()=>0; global.setTimeout=()=>0;
 global.AudioContext=global.webkitAudioContext=function(){throw 0};
-var FILE=process.argv[2]||'index.html';
+var FILE=process.argv[2]||'src/index-80.html';
 var src=fs.readFileSync(FILE,'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
 src+=';globalThis.__G={start:start,update:update,render:render,pick:pick,levelUp:levelUp,'+
  'mode:function(){return mode},set:function(k,v){if(k=="mode")mode=v;}};';
 (0,eval)(src);
 var G=globalThis.__G;
-G.render();                                    // ecran titre
+G.render();                                    // title screen
 G.start();
 for(var b=0;b<6;b++){ G.levelUp(); G.render(); G.pick(b%3); }
 for(var i=0;i<2000;i++){ G.update(0.016); G.render(); }
 G.set('mode','dead'); G.render();
 G.set('mode','win');  G.render();
-console.log('  smoke : titre, 6 montees, 2000 images, mort et victoire : ok');
+console.log('  smoke: title, 6 level-ups, 2000 frames, death and win: ok');
 
-}catch(e){ console.log('  smoke : PLANTAGE ->',e.message); process.exit(1); }
+}catch(e){ console.log('  smoke : CRASH ->',e.message); process.exit(1); }

@@ -1,7 +1,7 @@
-// Faux DOM commun aux tests : canvas, audio et boucle d'animation simules.
-// Le contexte imite Safari, qui renvoie la police normalisee avec le poids en
-// chiffres ('700 30px monospace'). C'est ce detail qui avait casse la police
-// bitmap de la version arcade : elle lisait 700 comme taille de caractere.
+// Fake DOM shared by the tests: simulated canvas, audio and animation loop.
+// The context mimics Safari, which returns the font normalized with a numeric
+// weight ('700 30px monospace'). That detail is what broke the bitmap font in
+// the arcade version: it read 700 as the character size.
 const fs = require('fs');
 
 function install(w, h, opts) {
@@ -44,11 +44,11 @@ function install(w, h, opts) {
   global.requestAnimationFrame = function () { return 0; };
   global.setInterval = function () { return 0; };
   global.setTimeout = function () { return 0; };
-  // pas d'audio : le jeu doit tourner meme si AudioContext echoue
+  // no audio: the game must run even if AudioContext fails
   global.AudioContext = global.webkitAudioContext = function () { throw new Error('no audio'); };
 }
 
-// Charge le <script> d'un index.html et expose les symboles demandes.
+// Loads the <script> from an index.html and exposes the requested symbols.
 function load(file, names) {
   var js = fs.readFileSync(file, 'utf8').match(/<script>([\s\S]*)<\/script>/)[1];
   (0, eval)(js + ';globalThis.__G={' + names.map(function (n) {
